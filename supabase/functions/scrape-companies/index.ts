@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
       const response = await fetch(url.toString(), {
         headers: {
-          'Authorization': apiKey,
+          'Authorization': 'Basic ' + btoa(apiKey + ':'),
         },
       });
 
