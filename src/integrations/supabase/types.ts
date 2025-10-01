@@ -14,7 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      scraper_logs: {
+        Row: {
+          id: string
+          level: Database["public"]["Enums"]["log_level"]
+          message: string
+          metadata: Json | null
+          run_id: string
+          timestamp: string
+        }
+        Insert: {
+          id?: string
+          level?: Database["public"]["Enums"]["log_level"]
+          message: string
+          metadata?: Json | null
+          run_id: string
+          timestamp?: string
+        }
+        Update: {
+          id?: string
+          level?: Database["public"]["Enums"]["log_level"]
+          message?: string
+          metadata?: Json | null
+          run_id?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraper_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "scraper_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scraper_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          csv_file_path: string | null
+          error_message: string | null
+          id: string
+          jsonl_file_path: string | null
+          pages_fetched: number | null
+          started_at: string
+          status: Database["public"]["Enums"]["run_status"]
+          target_date: string
+          total_companies: number | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          csv_file_path?: string | null
+          error_message?: string | null
+          id?: string
+          jsonl_file_path?: string | null
+          pages_fetched?: number | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["run_status"]
+          target_date: string
+          total_companies?: number | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          csv_file_path?: string | null
+          error_message?: string | null
+          id?: string
+          jsonl_file_path?: string | null
+          pages_fetched?: number | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["run_status"]
+          target_date?: string
+          total_companies?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +102,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      log_level: "info" | "warning" | "error" | "debug"
+      run_status: "pending" | "running" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +230,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      log_level: ["info", "warning", "error", "debug"],
+      run_status: ["pending", "running", "completed", "failed"],
+    },
   },
 } as const
