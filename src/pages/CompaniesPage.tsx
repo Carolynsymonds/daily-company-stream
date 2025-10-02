@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft, Mail, Search, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { useState } from "react";
 
 interface Company {
   id: string;
@@ -31,8 +32,11 @@ interface Officer {
   name: string;
   officer_role: string;
   appointed_on: string;
+  is_pre_1992_appointment?: boolean;
+  country_of_residence?: string;
   nationality?: string;
   occupation?: string;
+  person_number?: string;
   address?: {
     address_line_1?: string;
     country?: string;
@@ -44,11 +48,27 @@ interface Officer {
     month?: number;
     year?: number;
   };
+  links?: {
+    self?: string;
+    officer?: {
+      appointments?: string;
+    };
+  };
+}
+
+interface EmailSearchResult {
+  email?: string;
+  confidence?: number;
+  source?: string;
+  found: boolean;
+  error?: string;
 }
 
 export const CompaniesPage = () => {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
+  const [emailSearchResults, setEmailSearchResults] = useState<Record<string, EmailSearchResult>>({});
+  const [searchingEmails, setSearchingEmails] = useState<Set<string>>(new Set());
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -64,10 +84,14 @@ export const CompaniesPage = () => {
             name,
             officer_role,
             appointed_on,
+            is_pre_1992_appointment,
+            country_of_residence,
             nationality,
             occupation,
+            person_number,
             address,
-            date_of_birth
+            date_of_birth,
+            links
           )
         `)
         .eq("run_id", runId)
@@ -147,6 +171,75 @@ export const CompaniesPage = () => {
     ];
     
     return `${monthNames[dateOfBirth.month - 1]} ${dateOfBirth.year}`;
+  };
+
+  const searchEmail = async (officer: Officer) => {
+    const officerId = officer.id;
+    
+    // Add to searching state
+    setSearchingEmails(prev => new Set(prev).add(officerId));
+    
+    try {
+      // Build location string from address or country
+      let location = "";
+      if (officer.address) {
+        const parts = [
+          officer.address.locality,
+          officer.address.country
+        ].filter(Boolean);
+        location = parts.join(", ");
+      } else if (officer.country_of_residence) {
+        location = officer.country_of_residence;
+      }
+
+      const response = await fetch('/api/search-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: officer.name,
+          location: location,
+          occupation: officer.occupation
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      let result: EmailSearchResult;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error('Invalid JSON response from server');
+      }
+      
+      setEmailSearchResults(prev => ({
+        ...prev,
+        [officerId]: result
+      }));
+    } catch (error) {
+      setEmailSearchResults(prev => ({
+        ...prev,
+        [officerId]: {
+          found: false,
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        }
+      }));
+    } finally {
+      // Remove from searching state
+      setSearchingEmails(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(officerId);
+        return newSet;
+      });
+    }
   };
 
   if (isLoading) {
@@ -262,30 +355,150 @@ export const CompaniesPage = () => {
                 {company.officers && company.officers.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <h3 className="text-md font-semibold mb-3">Officers</h3>
-                    <div className="space-y-3">
-                      {company.officers.map((officer) => (
-                        <div key={officer.id} className="bg-gray-50 rounded p-3">
-                          <div className="space-y-1">
-                            <p className="font-medium">{officer.name}</p>
-                            <p className="text-sm text-gray-600 capitalize">{officer.officer_role}</p>
-                            <p className="text-sm text-gray-600">
-                              Appointed: {format(new Date(officer.appointed_on), "d MMMM yyyy")}
-                            </p>
-                            {officer.occupation && (
-                              <p className="text-sm text-gray-600">Occupation: {officer.occupation}</p>
-                            )}
-                            {officer.nationality && (
-                              <p className="text-sm text-gray-600">Nationality: {officer.nationality}</p>
-                            )}
+                    <div className="space-y-4">
+                      {company.officers.map((officer) => {
+                        const isSearching = searchingEmails.has(officer.id);
+                        const emailResult = emailSearchResults[officer.id];
+                        
+                        return (
+                          <div key={officer.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="space-y-2">
+                              {/* Officer Name and Email Search Button */}
+                              <div className="flex items-start justify-between">
+                                <h4 className="font-semibold text-lg">{officer.name}</h4>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => searchEmail(officer)}
+                                  disabled={isSearching}
+                                  className="h-8 px-3 text-xs"
+                                >
+                                  {isSearching ? (
+                                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  ) : (
+                                    <Search className="h-3 w-3 mr-1" />
+                                  )}
+                                  Find Email
+                                </Button>
+                              </div>
+                              
+                              {/* Role and Appointment */}
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                  {officer.officer_role}
+                                </span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Appointed: {format(new Date(officer.appointed_on), "d MMMM yyyy")}
+                                </span>
+                                {officer.is_pre_1992_appointment && (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    Pre-1992 Appointment
+                                  </span>
+                                )}
+                              </div>
+
+                            {/* Personal Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                              {officer.occupation && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Occupation:</span>
+                                  <span className="ml-2 text-gray-600">{officer.occupation}</span>
+                                </div>
+                              )}
+                              {officer.nationality && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Nationality:</span>
+                                  <span className="ml-2 text-gray-600">{officer.nationality}</span>
+                                </div>
+                              )}
+                              {officer.country_of_residence && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Country of Residence:</span>
+                                  <span className="ml-2 text-gray-600">{officer.country_of_residence}</span>
+                                </div>
+                              )}
+                              {officer.person_number && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Person Number:</span>
+                                  <span className="ml-2 text-gray-600 font-mono">{officer.person_number}</span>
+                                </div>
+                              )}
+                              {officer.date_of_birth && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Date of Birth:</span>
+                                  <span className="ml-2 text-gray-600">{formatOfficerDateOfBirth(officer.date_of_birth)}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Address */}
                             {officer.address && (
-                              <p className="text-sm text-gray-600">Address: {formatOfficerAddress(officer.address)}</p>
+                              <div className="mt-2">
+                                <span className="font-medium text-gray-700 text-sm">Address:</span>
+                                <p className="text-sm text-gray-600 mt-1">{formatOfficerAddress(officer.address)}</p>
+                              </div>
                             )}
-                            {officer.date_of_birth && (
-                              <p className="text-sm text-gray-600">Date of Birth: {formatOfficerDateOfBirth(officer.date_of_birth)}</p>
+
+                            {/* Email Search Results */}
+                            {emailResult && (
+                              <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                                {emailResult.found && emailResult.email ? (
+                                  <div className="flex items-center gap-2 text-green-700">
+                                    <Mail className="h-4 w-4" />
+                                    <span className="font-medium">{emailResult.email}</span>
+                                    {emailResult.confidence && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {Math.round(emailResult.confidence * 100)}% confidence
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : emailResult.error ? (
+                                  <div className="flex items-center gap-2 text-red-600">
+                                    <Mail className="h-4 w-4" />
+                                    <span className="text-sm">Error: {emailResult.error}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-gray-500">
+                                    <Mail className="h-4 w-4" />
+                                    <span className="text-sm">No email found</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Links */}
+                            {officer.links && (
+                              <div className="mt-3 pt-2 border-t border-gray-300">
+                                <div className="flex flex-wrap gap-2">
+                                  {officer.links.self && (
+                                    <a
+                                      href={`https://find-and-update.company-information.service.gov.uk${officer.links.self}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      View Appointment
+                                    </a>
+                                  )}
+                                  {officer.links.officer?.appointments && (
+                                    <a
+                                      href={`https://find-and-update.company-information.service.gov.uk${officer.links.officer.appointments}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      All Appointments
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

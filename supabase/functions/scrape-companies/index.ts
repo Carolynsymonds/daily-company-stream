@@ -91,13 +91,27 @@ async function fetchAndStoreOfficers(
   const authString = `${apiKey}:`;
   const encodedAuth = btoa(authString);
   
-  await log('debug', `Fetching officers for company ${companyNumber}`);
+  await log('debug', `Fetching officers for company ${companyNumber}`, {
+    url: officersUrl,
+    headers: {
+      'Authorization': `Basic ${encodedAuth.substring(0, 20)}...`,
+      'Accept': 'application/json',
+    }
+  });
   
   const response = await fetch(officersUrl, {
     headers: {
       'Authorization': `Basic ${encodedAuth}`,
       'Accept': 'application/json',
     },
+  });
+
+  // Log response headers and status
+  await log('debug', `Officers API response status for company ${companyNumber}:`, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    url: response.url
   });
 
   // Handle 429 with Retry-After
@@ -116,13 +130,40 @@ async function fetchAndStoreOfficers(
 
   const data: OfficersResponse = await response.json();
   
+  // Log the raw response for debugging
+  await log('debug', `Raw officers API response for company ${companyNumber}:`, data);
+  
+  // Log detailed officers API response
   await log('info', `Officers API Response for company ${companyNumber}:`, {
+    total_results: data.total_results,
+    start_index: data.start_index,
+    items_per_page: data.items_per_page,
     items_count: data.items.length,
-    sample_officer: data.items[0] ? {
-      name: data.items[0].name,
-      officer_role: data.items[0].officer_role,
-      appointed_on: data.items[0].appointed_on
-    } : null
+    full_response_keys: Object.keys(data),
+    all_officers: data.items.map(officer => ({
+      name: officer.name,
+      officer_role: officer.officer_role,
+      appointed_on: officer.appointed_on,
+      is_pre_1992_appointment: officer.is_pre_1992_appointment,
+      country_of_residence: officer.country_of_residence,
+      nationality: officer.nationality,
+      occupation: officer.occupation,
+      person_number: officer.person_number,
+      has_address: !!officer.address,
+      has_date_of_birth: !!officer.date_of_birth,
+      has_links: !!officer.links,
+      address_details: officer.address ? {
+        premises: officer.address.premises,
+        address_line_1: officer.address.address_line_1,
+        locality: officer.address.locality,
+        postal_code: officer.address.postal_code,
+        country: officer.address.country
+      } : null,
+      date_of_birth_details: officer.date_of_birth ? {
+        month: officer.date_of_birth.month,
+        year: officer.date_of_birth.year
+      } : null
+    }))
   });
 
   if (data.items.length > 0) {
@@ -141,14 +182,33 @@ async function fetchAndStoreOfficers(
       links: officer.links,
     }));
 
-    const { error: officersInsertError } = await supabase
+    // Log the data we're about to insert
+    await log('debug', `Preparing to insert officers for company ${companyNumber}:`, {
+      officers_count: officersToInsert.length,
+      sample_officer_data: officersToInsert[0] || null,
+      all_officer_names: officersToInsert.map(o => o.name)
+    });
+
+    const { data: insertedOfficers, error: officersInsertError } = await supabase
       .from('officers')
-      .insert(officersToInsert);
+      .insert(officersToInsert)
+      .select('id, name, officer_role');
 
     if (officersInsertError) {
-      await log('error', `Failed to store officers for company ${companyNumber}: ${officersInsertError.message}`);
+      await log('error', `Failed to store officers for company ${companyNumber}:`, {
+        error: officersInsertError.message,
+        error_details: officersInsertError,
+        attempted_officers: officersToInsert.length
+      });
     } else {
-      await log('info', `Stored ${officersToInsert.length} officers for company ${companyNumber}`);
+      await log('info', `Successfully stored ${insertedOfficers?.length || officersToInsert.length} officers for company ${companyNumber}:`, {
+        inserted_officers: insertedOfficers?.map(o => ({
+          id: o.id,
+          name: o.name,
+          role: o.officer_role
+        })) || [],
+        total_inserted: insertedOfficers?.length || officersToInsert.length
+      });
     }
   } else {
     await log('info', `No officers found for company ${companyNumber}`);

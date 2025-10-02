@@ -4,8 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, MapPin, Calendar, Hash, ExternalLink } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, Users, User, Mail, Search, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface CompanyDetailsProps {
   runId: string;
@@ -29,7 +32,50 @@ interface Company {
   created_at: string;
 }
 
+interface Officer {
+  id: string;
+  company_id: string;
+  name: string;
+  officer_role: string;
+  appointed_on: string;
+  is_pre_1992_appointment: boolean | null;
+  country_of_residence: string | null;
+  nationality: string | null;
+  occupation: string | null;
+  person_number: string | null;
+  address: {
+    address_line_1?: string;
+    country?: string;
+    locality?: string;
+    postal_code?: string;
+    premises?: string;
+  } | null;
+  date_of_birth: {
+    month?: number;
+    year?: number;
+  } | null;
+  links: {
+    self?: string;
+    officer?: {
+      appointments?: string;
+    };
+  } | null;
+  created_at: string;
+}
+
+interface EmailSearchResult {
+  email?: string;
+  confidence?: number;
+  source?: string;
+  found: boolean;
+  error?: string;
+}
+
 export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+  const [emailSearchResults, setEmailSearchResults] = useState<Record<string, EmailSearchResult>>({});
+  const [searchingEmails, setSearchingEmails] = useState<Set<string>>(new Set());
+
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
     queryFn: async () => {
@@ -42,6 +88,24 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       if (error) throw error;
       return data as Company[];
     },
+  });
+
+  const { data: officers } = useQuery({
+    queryKey: ["officers", runId],
+    queryFn: async () => {
+      if (!companies || companies.length === 0) return [];
+      
+      const companyIds = companies.map(c => c.id);
+      const { data, error } = await supabase
+        .from("officers")
+        .select("*")
+        .in("company_id", companyIds)
+        .order("appointed_on", { ascending: false });
+
+      if (error) throw error;
+      return data as Officer[];
+    },
+    enabled: !!companies && companies.length > 0,
   });
 
   const getStatusBadge = (status: string) => {
@@ -83,6 +147,106 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
     const month = d.toLocaleDateString('en-GB', { month: 'long' });
     const year = d.getFullYear();
     return `${day} ${month} ${year}`;
+  };
+
+  const formatAppointmentDate = (date: string) => {
+    const d = new Date(date);
+    const day = d.getDate();
+    const month = d.toLocaleDateString('en-GB', { month: 'long' });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  const formatOfficerAddress = (address: Officer["address"]) => {
+    if (!address) return "No address available";
+    
+    const parts = [
+      address.premises,
+      address.address_line_1,
+      address.locality,
+      address.postal_code,
+      address.country,
+    ].filter(Boolean);
+    
+    return parts.join(", ");
+  };
+
+  const formatDateOfBirth = (dob: Officer["date_of_birth"]) => {
+    if (!dob) return "Not available";
+    if (dob.month && dob.year) {
+      const monthName = new Date(dob.year, dob.month - 1).toLocaleDateString('en-GB', { month: 'long' });
+      return `${monthName} ${dob.year}`;
+    }
+    return "Partial date available";
+  };
+
+  const getOfficersForCompany = (companyId: string) => {
+    return officers?.filter(officer => officer.company_id === companyId) || [];
+  };
+
+  const toggleCompanyExpansion = (companyId: string) => {
+    const newExpanded = new Set(expandedCompanies);
+    if (newExpanded.has(companyId)) {
+      newExpanded.delete(companyId);
+    } else {
+      newExpanded.add(companyId);
+    }
+    setExpandedCompanies(newExpanded);
+  };
+
+  const searchEmail = async (officer: Officer) => {
+    const officerId = officer.id;
+    
+    // Add to searching state
+    setSearchingEmails(prev => new Set(prev).add(officerId));
+    
+    try {
+      // Build location string from address or country
+      let location = "";
+      if (officer.address) {
+        const parts = [
+          officer.address.locality,
+          officer.address.country
+        ].filter(Boolean);
+        location = parts.join(", ");
+      } else if (officer.country_of_residence) {
+        location = officer.country_of_residence;
+      }
+
+      const response = await fetch('/api/search-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: officer.name,
+          location: location,
+          occupation: officer.occupation
+        }),
+      });
+
+      const result: EmailSearchResult = await response.json();
+      
+      setEmailSearchResults(prev => ({
+        ...prev,
+        [officerId]: result
+      }));
+    } catch (error) {
+      setEmailSearchResults(prev => ({
+        ...prev,
+        [officerId]: {
+          found: false,
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        }
+      }));
+    } finally {
+      // Remove from searching state
+      setSearchingEmails(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(officerId);
+        return newSet;
+      });
+    }
   };
 
   if (isLoading) {
@@ -133,47 +297,166 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[500px] w-full">
+        <ScrollArea className="h-[600px] w-full">
           <div className="space-y-4">
-            {companies.map((company) => (
-              <div key={company.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="space-y-2">
-                  {/* Company Name */}
-                  <h2 className="text-lg font-semibold mb-1">
-                    <a 
-                      className="text-blue-600 hover:text-blue-800 hover:underline" 
-                      href={`https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {company.company_name}
-                      <span className="sr-only">(link opens a new window)</span>
-                    </a>
-                  </h2>
-                  
-                  {/* Status */}
-                  <p className="mb-2">
-                    <span className="font-semibold capitalize">
-                      {company.company_status}
-                    </span>
-                  </p>
-                  
-                  {/* Company Details List */}
-                  <ul className="text-sm space-y-1 list-none pl-0">
-                    <li>{formatCompanyType(company.company_type)}</li>
-                    <li></li>
-                    <li>
-                      {company.company_number} - Incorporadddted on {formatIncorporationDate(company.date_of_creation)}
-                    </li>
-                    <li></li>
-                    <li>{formatAddress(company.registered_office_address)}</li>
-                    {company.sic_codes && company.sic_codes.length > 0 && (
-                      <li>SIC codes - {company.sic_codes.join(", ")}</li>
-                    )}
-                  </ul>
+            {companies.map((company) => {
+              const companyOfficers = getOfficersForCompany(company.id);
+              const isExpanded = expandedCompanies.has(company.id);
+              
+              return (
+                <div key={company.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="space-y-2">
+                    {/* Company Name and Officers Toggle */}
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold mb-1">
+                        <a 
+                          className="text-blue-600 hover:text-blue-800 hover:underline" 
+                          href={`https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {company.company_name}
+                          <span className="sr-only">(link opens a new window)</span>
+                        </a>
+                      </h2>
+                      
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleCompanyExpansion(company.id)}>
+                        <CollapsibleTrigger asChild>
+                          <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                            <Users className="h-4 w-4" />
+                            {companyOfficers.length} officer{companyOfficers.length !== 1 ? 's' : ''}
+                            <span className="text-xs">
+                              {isExpanded ? '▼' : '▶'}
+                            </span>
+                          </button>
+                        </CollapsibleTrigger>
+                      </Collapsible>
+                    </div>
+                    
+                    {/* Status */}
+                    <p className="mb-2">
+                      <span className="font-semibold capitalize">
+                        {company.company_status}
+                      </span>
+                    </p>
+                    
+                    {/* Company Details List */}
+                    <ul className="text-sm space-y-1 list-none pl-0">
+                      <li>{formatCompanyType(company.company_type)}</li>
+                      <li>
+                        {company.company_number} - Incorporated on {formatIncorporationDate(company.date_of_creation)}
+                      </li>
+                      <li>{formatAddress(company.registered_office_address)}</li>
+                      {company.sic_codes && company.sic_codes.length > 0 && (
+                        <li>SIC codes - {company.sic_codes.join(", ")}</li>
+                      )}
+                    </ul>
+
+                    {/* Officers Section */}
+                    <Collapsible open={isExpanded} onOpenChange={() => toggleCompanyExpansion(company.id)}>
+                      <CollapsibleContent className="mt-4">
+                        {companyOfficers.length > 0 ? (
+                          <div className="border-t pt-4">
+                            <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              Officers & Directors
+                            </h3>
+                            <div className="space-y-3">
+                              {companyOfficers.map((officer) => {
+                                const isSearching = searchingEmails.has(officer.id);
+                                const emailResult = emailSearchResults[officer.id];
+                                
+                                return (
+                                  <div key={officer.id} className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <User className="h-4 w-4 text-gray-600" />
+                                        <h4 className="font-medium">{officer.name}</h4>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">
+                                          {officer.officer_role}
+                                        </Badge>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => searchEmail(officer)}
+                                          disabled={isSearching}
+                                          className="h-6 px-2 text-xs"
+                                        >
+                                          {isSearching ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Search className="h-3 w-3" />
+                                          )}
+                                          <span className="ml-1">Find Email</span>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="text-sm space-y-1 text-gray-600">
+                                      <p><strong>Appointed:</strong> {formatAppointmentDate(officer.appointed_on)}</p>
+                                      {officer.occupation && (
+                                        <p><strong>Occupation:</strong> {officer.occupation}</p>
+                                      )}
+                                      {officer.nationality && (
+                                        <p><strong>Nationality:</strong> {officer.nationality}</p>
+                                      )}
+                                      {officer.country_of_residence && (
+                                        <p><strong>Country of Residence:</strong> {officer.country_of_residence}</p>
+                                      )}
+                                      {officer.date_of_birth && (
+                                        <p><strong>Date of Birth:</strong> {formatDateOfBirth(officer.date_of_birth)}</p>
+                                      )}
+                                      {officer.address && (
+                                        <p><strong>Address:</strong> {formatOfficerAddress(officer.address)}</p>
+                                      )}
+                                      
+                                      {/* Email Search Results */}
+                                      {emailResult && (
+                                        <div className="mt-2 p-2 bg-white rounded border">
+                                          {emailResult.found && emailResult.email ? (
+                                            <div className="flex items-center gap-2 text-green-700">
+                                              <Mail className="h-4 w-4" />
+                                              <span className="font-medium">{emailResult.email}</span>
+                                              {emailResult.confidence && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                  {Math.round(emailResult.confidence * 100)}% confidence
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          ) : emailResult.error ? (
+                                            <div className="flex items-center gap-2 text-red-600">
+                                              <Mail className="h-4 w-4" />
+                                              <span className="text-sm">Error: {emailResult.error}</span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-2 text-gray-500">
+                                              <Mail className="h-4 w-4" />
+                                              <span className="text-sm">No email found</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="border-t pt-4">
+                            <p className="text-sm text-gray-500 italic">
+                              No officers found for this company.
+                            </p>
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </CardContent>
