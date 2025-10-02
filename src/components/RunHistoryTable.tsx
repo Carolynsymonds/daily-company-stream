@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, ExternalLink } from "lucide-react";
+import { Download, ExternalLink, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const RunHistoryTable = () => {
+  const navigate = useNavigate();
+
   const { data: runs, isLoading } = useQuery({
     queryKey: ["scraper-runs"],
     queryFn: async () => {
@@ -97,6 +100,14 @@ export const RunHistoryTable = () => {
                 <TableCell className="text-right font-mono">{run.pages_fetched}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate(`/companies/${run.id}`)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
                     {run.jsonl_file_path && (
                       <Button
                         variant="ghost"

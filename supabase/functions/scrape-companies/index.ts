@@ -21,11 +21,50 @@ interface CompanySearchResult {
   sic_codes?: string[];
 }
 
+interface Officer {
+  name: string;
+  officer_role: string;
+  appointed_on: string;
+  is_pre_1992_appointment?: boolean;
+  country_of_residence?: string;
+  nationality?: string;
+  occupation?: string;
+  person_number?: string;
+  address?: {
+    address_line_1?: string;
+    country?: string;
+    locality?: string;
+    postal_code?: string;
+    premises?: string;
+  };
+  date_of_birth?: {
+    month?: number;
+    year?: number;
+  };
+  links?: {
+    self?: string;
+    officer?: {
+      appointments?: string;
+    };
+  };
+}
+
+interface OfficersResponse {
+  items: Officer[];
+  total_results?: number;
+  start_index?: number;
+  items_per_page?: number;
+}
+
 interface SearchResponse {
   items: CompanySearchResult[];
-  items_per_page: number;
-  start_index: number;
-  total_results: number;
+  total_results?: number;
+  start_index?: number;
+  items_per_page?: number;
+  // Alternative field names that might be used
+  totalResults?: number;
+  startIndex?: number;
+  itemsPerPage?: number;
 }
 
 interface RateLimitState {
@@ -36,6 +75,88 @@ interface RateLimitState {
 const RATE_LIMIT = 600; // 600 requests per 5 minutes
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
 const PAGE_SIZE = 100; // Max allowed by API
+const MAX_COMPANIES = 5; // Limit to 5 companies for demo purposes
+
+// Helper function to fetch and store officers for a company
+async function fetchAndStoreOfficers(
+  companyId: string, 
+  companyNumber: string, 
+  apiKey: string, 
+  supabase: any, 
+  log: (level: string, message: string, metadata?: any) => Promise<void>
+) {
+  const officersUrl = `https://api.company-information.service.gov.uk/company/${companyNumber}/officers`;
+  
+  // Create Basic Auth header
+  const authString = `${apiKey}:`;
+  const encodedAuth = btoa(authString);
+  
+  await log('debug', `Fetching officers for company ${companyNumber}`);
+  
+  const response = await fetch(officersUrl, {
+    headers: {
+      'Authorization': `Basic ${encodedAuth}`,
+      'Accept': 'application/json',
+    },
+  });
+
+  // Handle 429 with Retry-After
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After');
+    const waitSeconds = retryAfter ? parseInt(retryAfter) : 60;
+    await log('warning', `Received 429 for officers API. Retrying after ${waitSeconds}s...`);
+    await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+    return fetchAndStoreOfficers(companyId, companyNumber, apiKey, supabase, log);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Officers API request failed (${response.status}): ${errorText}`);
+  }
+
+  const data: OfficersResponse = await response.json();
+  
+  await log('info', `Officers API Response for company ${companyNumber}:`, {
+    items_count: data.items.length,
+    sample_officer: data.items[0] ? {
+      name: data.items[0].name,
+      officer_role: data.items[0].officer_role,
+      appointed_on: data.items[0].appointed_on
+    } : null
+  });
+
+  if (data.items.length > 0) {
+    const officersToInsert = data.items.map(officer => ({
+      company_id: companyId,
+      name: officer.name,
+      officer_role: officer.officer_role,
+      appointed_on: officer.appointed_on,
+      is_pre_1992_appointment: officer.is_pre_1992_appointment || false,
+      country_of_residence: officer.country_of_residence,
+      nationality: officer.nationality,
+      occupation: officer.occupation,
+      person_number: officer.person_number,
+      address: officer.address,
+      date_of_birth: officer.date_of_birth,
+      links: officer.links,
+    }));
+
+    const { error: officersInsertError } = await supabase
+      .from('officers')
+      .insert(officersToInsert);
+
+    if (officersInsertError) {
+      await log('error', `Failed to store officers for company ${companyNumber}: ${officersInsertError.message}`);
+    } else {
+      await log('info', `Stored ${officersToInsert.length} officers for company ${companyNumber}`);
+    }
+  } else {
+    await log('info', `No officers found for company ${companyNumber}`);
+  }
+
+  // Small delay between officer requests
+  await new Promise(resolve => setTimeout(resolve, 200));
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -43,9 +164,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const apiKey = Deno.env.get('COMPANIES_HOUSE_API_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const apiKey = Deno.env.get('COMPANIES_HOUSE_API_KEY');
+
+    if (!supabaseUrl) {
+      throw new Error('SUPABASE_URL environment variable is not set');
+    }
+    if (!supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+    }
+    if (!apiKey) {
+      throw new Error('COMPANIES_HOUSE_API_KEY environment variable is not set');
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -86,7 +217,7 @@ Deno.serve(async (req) => {
       });
     };
 
-    await log('info', `Starting scrape for date: ${dateToFetch}`);
+    await log('info', `Starting scrape for date: ${dateToFetch} (limited to ${MAX_COMPANIES} companies)`);
 
     const allCompanies: CompanySearchResult[] = [];
     let startIndex = 0;
@@ -162,9 +293,24 @@ Deno.serve(async (req) => {
 
       const data: SearchResponse = await response.json();
 
+      // Log the API response with more detailed information
+      await log('info', `API Response for page ${pagesFetched + 1}:`, {
+        total_results: data.total_results || data.totalResults,
+        start_index: data.start_index || data.startIndex,
+        items_per_page: data.items_per_page || data.itemsPerPage,
+        items_count: data.items.length,
+        response_keys: Object.keys(data),
+        sample_company: data.items[0] ? {
+          company_number: data.items[0].company_number,
+          company_name: data.items[0].company_name,
+          company_status: data.items[0].company_status,
+          date_of_creation: data.items[0].date_of_creation
+        } : null
+      });
+
       if (pagesFetched === 0) {
-        totalResults = data.total_results;
-        await log('info', `Found ${totalResults} companies incorporated on ${dateToFetch}`);
+        totalResults = data.total_results || data.totalResults || data.items.length;
+        await log('info', `Found ${totalResults} companies incorporated on ${dateToFetch} (estimated from first page)`);
       }
 
       allCompanies.push(...data.items);
@@ -182,8 +328,8 @@ Deno.serve(async (req) => {
 
       await log('info', `Fetched page ${pagesFetched}. Total companies: ${allCompanies.length}/${totalResults}`);
 
-      // Break if we've fetched all results
-      if (allCompanies.length >= totalResults) {
+      // Break if we've reached the limit or if we got fewer items than requested (indicating last page)
+      if (allCompanies.length >= MAX_COMPANIES || data.items.length < PAGE_SIZE) {
         break;
       }
 
@@ -192,10 +338,58 @@ Deno.serve(async (req) => {
 
     } while (true);
 
-    await log('info', `Completed fetching all ${allCompanies.length} companies. Generating exports...`);
+    // Limit to MAX_COMPANIES if we fetched more
+    const limitedCompanies = allCompanies.slice(0, MAX_COMPANIES);
+    
+    await log('info', `Completed fetching ${allCompanies.length} companies. Limited to ${limitedCompanies.length} for storage. Generating exports...`);
+
+    // Store companies in database
+    if (limitedCompanies.length > 0) {
+      const companiesToInsert = limitedCompanies.map(company => ({
+        run_id: runId,
+        company_number: company.company_number,
+        company_name: company.company_name,
+        company_status: company.company_status,
+        company_type: company.company_type,
+        date_of_creation: company.date_of_creation,
+        registered_office_address: company.registered_office_address,
+        sic_codes: company.sic_codes,
+      }));
+
+      try {
+        const { data: insertedCompanies, error: insertError } = await supabase
+          .from('companies')
+          .insert(companiesToInsert)
+          .select('id, company_number');
+
+        if (insertError) {
+          await log('error', `Failed to store companies in database: ${insertError.message}`);
+          // Continue execution even if database storage fails
+        } else {
+          await log('info', `Stored ${companiesToInsert.length} companies in database`);
+          
+          // Fetch officers for each company
+          if (insertedCompanies && insertedCompanies.length > 0) {
+            await log('info', `Starting to fetch officers for ${insertedCompanies.length} companies...`);
+            
+            for (const company of insertedCompanies) {
+              try {
+                await fetchAndStoreOfficers(company.id, company.company_number, apiKey, supabase, log);
+              } catch (officerError) {
+                await log('error', `Failed to fetch officers for company ${company.company_number}: ${officerError}`);
+                // Continue with other companies even if one fails
+              }
+            }
+          }
+        }
+      } catch (dbError) {
+        await log('error', `Database error while storing companies: ${dbError}`);
+        // Continue execution even if database storage fails
+      }
+    }
 
     // Generate JSONL
-    const jsonlContent = allCompanies.map(company => JSON.stringify(company)).join('\n');
+    const jsonlContent = limitedCompanies.map(company => JSON.stringify(company)).join('\n');
     const jsonlFileName = `companies-${dateToFetch}.jsonl`;
     
     const { error: jsonlUploadError } = await supabase.storage
@@ -223,7 +417,7 @@ Deno.serve(async (req) => {
       'sic_codes',
     ];
 
-    const csvRows = allCompanies.map(company => [
+    const csvRows = limitedCompanies.map(company => [
       company.company_number,
       `"${(company.company_name || '').replace(/"/g, '""')}"`,
       company.company_status,
@@ -258,7 +452,7 @@ Deno.serve(async (req) => {
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        total_companies: allCompanies.length,
+        total_companies: limitedCompanies.length,
         pages_fetched: pagesFetched,
         jsonl_file_path: jsonlFileName,
         csv_file_path: csvFileName,
@@ -269,7 +463,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         runId,
-        totalCompanies: allCompanies.length,
+        totalCompanies: limitedCompanies.length,
         pagesFetched,
         jsonlFile: jsonlFileName,
         csvFile: csvFileName,
@@ -285,12 +479,23 @@ Deno.serve(async (req) => {
 
     // Try to update run status if we have runId
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { runId } = await req.json().catch(() => ({}));
-      if (runId) {
+      // Get runId from the request body
+      const { targetDate } = await req.json().catch(() => ({}));
+      
+      // Find the most recent run for this target date to update its status
+      const { data: recentRun } = await supabase
+        .from('scraper_runs')
+        .select('id')
+        .eq('target_date', targetDate || new Date().toISOString().split('T')[0])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (recentRun) {
         await supabase
           .from('scraper_runs')
           .update({
@@ -298,7 +503,7 @@ Deno.serve(async (req) => {
             completed_at: new Date().toISOString(),
             error_message: error instanceof Error ? error.message : String(error),
           })
-          .eq('id', runId);
+          .eq('id', recentRun.id);
       }
     } catch (updateError) {
       console.error('Failed to update run status:', updateError);

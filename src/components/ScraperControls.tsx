@@ -9,7 +9,14 @@ import { toast } from "sonner";
 
 export const ScraperControls = () => {
   const [isRunning, setIsRunning] = useState(false);
-  const [targetDate, setTargetDate] = useState("");
+  // Calculate yesterday in Europe/London
+  const getYesterday = () => {
+    const londonTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
+    londonTime.setDate(londonTime.getDate() - 1);
+    return londonTime.toISOString().split("T")[0];
+  };
+
+  const [targetDate, setTargetDate] = useState(getYesterday());
 
   const handleRunScraper = async () => {
     setIsRunning(true);
@@ -29,13 +36,6 @@ export const ScraperControls = () => {
     } finally {
       setIsRunning(false);
     }
-  };
-
-  // Calculate yesterday in Europe/London
-  const getYesterday = () => {
-    const londonTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
-    londonTime.setDate(londonTime.getDate() - 1);
-    return londonTime.toISOString().split("T")[0];
   };
 
   return (
