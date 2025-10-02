@@ -131,9 +131,15 @@ Deno.serve(async (req) => {
 
       await log('debug', `Fetching page at start_index: ${startIndex}`);
 
+      // Create Basic Auth header - API key is username, password is empty
+      const authString = `${apiKey}:`;
+      const encodedAuth = btoa(authString);
+      
+      await log('debug', `Auth header (first 20 chars): Basic ${encodedAuth.substring(0, 20)}...`);
+
       const response = await fetch(url.toString(), {
         headers: {
-          'Authorization': 'Basic ' + btoa(apiKey + ':'),
+          'Authorization': `Basic ${encodedAuth}`,
           'Accept': 'application/json',
         },
       });
