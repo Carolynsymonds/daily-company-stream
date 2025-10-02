@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
       const response = await fetch(url.toString(), {
         headers: {
           'Authorization': 'Basic ' + btoa(apiKey + ':'),
+          'Accept': 'application/json',
         },
       });
 
