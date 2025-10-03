@@ -180,25 +180,35 @@ export const CompaniesPage = () => {
     setSearchingEmails(prev => new Set(prev).add(officerId));
     
     try {
-      // Build location string from address or country
+      // Extract last name and first name from "BRADTKE, Peter Edward Charles"
+      let searchName = officer.name;
+      if (officer.name.includes(',')) {
+        const parts = officer.name.split(',');
+        const lastName = parts[0].trim();
+        const firstNamePart = parts[1].trim().split(' ')[0]; // Get first name only
+        searchName = `${lastName}, ${firstNamePart}`;
+      }
+
+      // Use country of residence as location
       let location = "";
-      if (officer.address) {
-        const parts = [
-          officer.address.locality,
-          officer.address.country
-        ].filter(Boolean);
-        location = parts.join(", ");
-      } else if (officer.country_of_residence) {
+      if (officer.country_of_residence) {
         location = officer.country_of_residence;
       }
 
-      const response = await fetch('/api/search-email', {
+      console.log('Email search params:', {
+        originalName: officer.name,
+        searchName: searchName,
+        location: location,
+        occupation: officer.occupation
+      });
+
+      const response = await fetch('/api/v1/search-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: officer.name,
+          name: searchName,
           location: location,
           occupation: officer.occupation
         }),
