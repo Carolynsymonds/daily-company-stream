@@ -461,7 +461,7 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[600px] w-full">
-          <Accordion type="multiple" className="space-y-2">
+          <Accordion type="single" collapsible className="space-y-2">
             {filteredCompanies?.map((company) => {
               const companyOfficers = getOfficersForCompany(company.id);
               const isExpanded = expandedCompanies.has(company.id);
