@@ -84,7 +84,6 @@ interface EmailSearchResult {
 }
 
 export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
-  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [emailSearchResults, setEmailSearchResults] = useState<Record<string, EmailSearchResult>>({});
   const [searchingEmails, setSearchingEmails] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -235,16 +234,6 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
   const getOfficersForCompany = (companyId: string) => {
     if (!officers) return [];
     return officers.filter(officer => officer.company_id === companyId);
-  };
-
-  const toggleCompanyExpansion = (companyId: string) => {
-    const newExpanded = new Set(expandedCompanies);
-    if (newExpanded.has(companyId)) {
-      newExpanded.delete(companyId);
-    } else {
-      newExpanded.add(companyId);
-    }
-    setExpandedCompanies(newExpanded);
   };
 
   const searchEmail = async (officer: Officer) => {
@@ -464,23 +453,22 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
           <Accordion type="single" collapsible className="space-y-2">
             {filteredCompanies?.map((company) => {
               const companyOfficers = getOfficersForCompany(company.id);
-              const isExpanded = expandedCompanies.has(company.id);
               
               return (
-                <AccordionItem key={company.id} value={company.id} className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full pr-4">
+                <AccordionItem key={company.id} value={company.id} className="border rounded-lg">
+                  <AccordionTrigger className="hover:no-underline px-4">
+                    <div className="flex items-center justify-between w-full">
                       <h2 className="text-lg font-semibold text-left">
                         {company.company_name}
                       </h2>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs ml-2">
                         {companyOfficers.length} officer{companyOfficers.length !== 1 ? 's' : ''}
                       </Badge>
                     </div>
                   </AccordionTrigger>
                   
-                  <AccordionContent>
-                    <div className="space-y-4 pt-2">
+                  <AccordionContent className="px-4">
+                    <div className="space-y-4 pt-2 pb-4">
                       {/* Company Details */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
