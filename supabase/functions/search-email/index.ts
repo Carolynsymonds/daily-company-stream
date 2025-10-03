@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
 
     // Helper function to get full profile details including emails
     const getProfileDetails = async (profileId: number): Promise<any> => {
-      const lookupUrl = 'https://api.rocketreach.co/v1/api/lookupProfile';
+      const lookupUrl = `https://api.rocketreach.co/v1/api/lookupProfile?id=${profileId}`;
       
       console.log('🔍 Looking up full profile details for ID:', profileId);
       console.log('📋 Lookup URL:', lookupUrl);
@@ -190,8 +190,7 @@ Deno.serve(async (req) => {
           headers: {
             'Content-Type': 'application/json',
             'API-Key': apiKey,
-          },
-          body: JSON.stringify({ id: profileId })
+          }
         });
 
         console.log('Profile lookup response status:', response.status);
