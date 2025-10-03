@@ -262,10 +262,12 @@ Deno.serve(async (req) => {
         });
         
         // Use detailed emails if available, otherwise fall back to teaser emails
-        const finalEmails = detailedEmails.length > 0 ? detailedEmails : allTeaserEmails;
-        const primaryEmail = finalEmails.length > 0 ? 
-          (typeof finalEmails[0] === 'string' ? finalEmails[0] : 
-           (typeof finalEmails[0] === 'object' && finalEmails[0].email ? finalEmails[0].email : finalEmails[0])) : 
+        // Extract email strings from objects if they're in object format
+        const finalEmails = detailedEmails.length > 0 ? 
+          detailedEmails.map(e => typeof e === 'string' ? e : e.email) : 
+          allTeaserEmails;
+        
+        const primaryEmail = finalEmails.length > 0 ? finalEmails[0] :
           (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined);
         
         console.log('📊 Final email data:', { finalEmails, primaryEmail });
