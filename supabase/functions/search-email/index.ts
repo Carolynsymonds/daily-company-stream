@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     };
 
     // Helper function to process search results
-    const processResults = (data: RocketReachResponse, source: string): Response | null => {
+    const processResults = (data: RocketReachResponse, source: string, searchParams?: Record<string, string>): Response | null => {
       console.log(`Processing results from ${source}...`);
       console.log('Profiles in response:', data.profiles?.length || 0);
       
@@ -221,6 +221,14 @@ Deno.serve(async (req) => {
          
          console.log('🎉 SUCCESS! Found contact details');
          console.log('🏆 WINNING SEARCH METHOD:', source);
+         console.log('📋 PARAMETERS SENT TO API:');
+         if (searchParams) {
+           Object.entries(searchParams).forEach(([key, value]) => {
+             console.log(`   ${key}: ${value}`);
+           });
+         } else {
+           console.log('   (parameters not available)');
+         }
          console.log('📊 FINAL RESULT DATA:', responseData);
         
         return new Response(
@@ -263,13 +271,14 @@ Deno.serve(async (req) => {
       const companySicNumber = company_sic_code.split(' - ')[0];
       console.log('Extracted SIC number:', companySicNumber);
       
-      const search1Data = await performSearch({
+      const search1Params = {
         'geo[]': `"${location}"`,
         'company_sic_code[]': companySicNumber
-      }, 'Search 1 (name + location + company_sic_code)');
+      };
+      const search1Data = await performSearch(search1Params, 'Search 1 (name + location + company_sic_code)');
 
       if (search1Data) {
-        const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)');
+        const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)', search1Params);
         if (result) {
           console.log('✅ Search 1 succeeded! Returning result from Search 1');
           return result;
@@ -284,12 +293,13 @@ Deno.serve(async (req) => {
     if (detailed_location) {
       console.log('Starting Search 2 with detailed_location:', detailed_location);
       
-      const search2Data = await performSearch({
+      const search2Params = {
         'geo[]': `"${detailed_location}"`
-      }, 'Search 2 (name + detailed_location)');
+      };
+      const search2Data = await performSearch(search2Params, 'Search 2 (name + detailed_location)');
 
       if (search2Data) {
-        const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)');
+        const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)', search2Params);
         if (result) {
           console.log('✅ Search 2 succeeded! Returning result from Search 2');
           return result;
@@ -303,12 +313,13 @@ Deno.serve(async (req) => {
     // SEARCH 3: name + location (ALWAYS EXECUTED)
     console.log('Starting Search 3 with location:', location);
     
-    const search3Data = await performSearch({
+    const search3Params = {
       'geo[]': `"${location}"`
-    }, 'Search 3 (name + location)');
+    };
+    const search3Data = await performSearch(search3Params, 'Search 3 (name + location)');
 
     if (search3Data) {
-      const result = processResults(search3Data, 'RocketReach (Search 3: name + location)');
+      const result = processResults(search3Data, 'RocketReach (Search 3: name + location)', search3Params);
       if (result) {
         console.log('✅ Search 3 succeeded! Returning result from Search 3');
         return result;
