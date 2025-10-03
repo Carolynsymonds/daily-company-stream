@@ -85,6 +85,8 @@ export const CompaniesPage = () => {
   const [filterByPhone, setFilterByPhone] = useState(false);
   const [filterByLinkedIn, setFilterByLinkedIn] = useState(false);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+  const [isFindingAllContacts, setIsFindingAllContacts] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -331,6 +333,38 @@ export const CompaniesPage = () => {
     }
   };
 
+  const findAllContactDetails = async () => {
+    if (!companies) return;
+    
+    setIsFindingAllContacts(true);
+    const allOfficers = companies.flatMap(c => c.officers || []);
+    const totalOfficers = allOfficers.length;
+    let completed = 0;
+    
+    setProgressMessage(`Finding contact details for ${totalOfficers} officers...`);
+    
+    for (const officer of allOfficers) {
+      // Skip if already searched
+      if (emailSearchResults[officer.id]) {
+        completed++;
+        continue;
+      }
+      
+      await searchEmail(officer);
+      completed++;
+      setProgressMessage(`Progress: ${completed}/${totalOfficers} officers processed`);
+      
+      // Add a small delay to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    setProgressMessage(`Completed! Found contact details for ${completed} officers.`);
+    setTimeout(() => {
+      setProgressMessage("");
+      setIsFindingAllContacts(false);
+    }, 3000);
+  };
+
   const hasContactInfo = (company: Company & { officers: Officer[] }, type?: 'email' | 'phone' | 'linkedin') => {
     return company.officers.some(officer => {
       const result = emailSearchResults[officer.id];
@@ -449,43 +483,70 @@ export const CompaniesPage = () => {
                 {filteredCompanies?.length || 0} companies found for {runInfo?.target_date && format(new Date(runInfo.target_date), "PPP")}
                 {(filterByEmail || filterByPhone || filterByLinkedIn) && ' (filtered)'}
               </p>
+              {progressMessage && (
+                <p className="text-sm text-blue-600 font-medium">
+                  {progressMessage}
+                </p>
+              )}
             </div>
             
-            <div className="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Filter className="h-4 w-4" />
-                Filter by Contact
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="filter-email"
-                    checked={filterByEmail}
-                    onCheckedChange={(checked) => setFilterByEmail(!!checked)}
-                  />
-                  <Label htmlFor="filter-email" className="text-sm cursor-pointer">
-                    Has Email
-                  </Label>
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="default"
+                size="lg"
+                onClick={findAllContactDetails}
+                disabled={isFindingAllContacts}
+                className="gap-2"
+              >
+                {isFindingAllContacts ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Finding...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    Find Contact Details for All
+                  </>
+                )}
+              </Button>
+              
+              <div className="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Filter className="h-4 w-4" />
+                  Filter by Contact
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="filter-phone"
-                    checked={filterByPhone}
-                    onCheckedChange={(checked) => setFilterByPhone(!!checked)}
-                  />
-                  <Label htmlFor="filter-phone" className="text-sm cursor-pointer">
-                    Has Phone
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="filter-linkedin"
-                    checked={filterByLinkedIn}
-                    onCheckedChange={(checked) => setFilterByLinkedIn(!!checked)}
-                  />
-                  <Label htmlFor="filter-linkedin" className="text-sm cursor-pointer">
-                    Has LinkedIn
-                  </Label>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="filter-email"
+                      checked={filterByEmail}
+                      onCheckedChange={(checked) => setFilterByEmail(!!checked)}
+                    />
+                    <Label htmlFor="filter-email" className="text-sm cursor-pointer">
+                      Has Email
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="filter-phone"
+                      checked={filterByPhone}
+                      onCheckedChange={(checked) => setFilterByPhone(!!checked)}
+                    />
+                    <Label htmlFor="filter-phone" className="text-sm cursor-pointer">
+                      Has Phone
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="filter-linkedin"
+                      checked={filterByLinkedIn}
+                      onCheckedChange={(checked) => setFilterByLinkedIn(!!checked)}
+                    />
+                    <Label htmlFor="filter-linkedin" className="text-sm cursor-pointer">
+                      Has LinkedIn
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
