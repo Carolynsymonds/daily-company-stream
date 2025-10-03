@@ -266,6 +266,7 @@ export type Database = {
           status: Database["public"]["Enums"]["run_status"]
           target_date: string
           total_companies: number | null
+          total_results_from_api: number | null
           updated_at: string
         }
         Insert: {
@@ -280,6 +281,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["run_status"]
           target_date: string
           total_companies?: number | null
+          total_results_from_api?: number | null
           updated_at?: string
         }
         Update: {
@@ -294,6 +296,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["run_status"]
           target_date?: string
           total_companies?: number | null
+          total_results_from_api?: number | null
           updated_at?: string
         }
         Relationships: []

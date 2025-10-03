@@ -372,6 +372,12 @@ Deno.serve(async (req) => {
       if (pagesFetched === 0) {
         totalResults = data.total_results || data.totalResults || data.items.length;
         await log('info', `Found ${totalResults} companies incorporated on ${dateToFetch} (estimated from first page)`);
+        
+        // Store the total results from API
+        await supabase
+          .from('scraper_runs')
+          .update({ total_results_from_api: totalResults })
+          .eq('id', runId);
       }
 
       allCompanies.push(...data.items);

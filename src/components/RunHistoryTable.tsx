@@ -97,7 +97,12 @@ export const RunHistoryTable = () => {
                 <TableCell className="text-sm">
                   {duration ? `${duration}s` : run.status === "running" ? "Running..." : "-"}
                 </TableCell>
-                <TableCell className="text-right font-mono">{run.total_companies.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {run.total_results_from_api 
+                    ? `${run.total_companies.toLocaleString()} / ${run.total_results_from_api.toLocaleString()}`
+                    : run.total_companies.toLocaleString()
+                  }
+                </TableCell>
                 <TableCell className="text-right font-mono">{run.pages_fetched}</TableCell>
                 <TableCell>
                   <div className="flex items-center justify-center gap-2">
