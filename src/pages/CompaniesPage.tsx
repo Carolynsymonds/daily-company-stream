@@ -202,33 +202,16 @@ export const CompaniesPage = () => {
         occupation: officer.occupation
       });
 
-      const response = await fetch('/api/v1/search-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('search-email', {
+        body: {
           name: searchName,
           location: location,
           occupation: officer.occupation
-        }),
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const responseText = await response.text();
-      if (!responseText) {
-        throw new Error('Empty response from server');
-      }
-
-      let result: EmailSearchResult;
-      try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        throw new Error('Invalid JSON response from server');
-      }
+      if (error) throw error;
+      const result: EmailSearchResult = data;
       
       setEmailSearchResults(prev => ({
         ...prev,

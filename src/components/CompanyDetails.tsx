@@ -213,19 +213,16 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
         location = officer.country_of_residence;
       }
 
-      const response = await fetch('/api/search-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('search-email', {
+        body: {
           name: officer.name,
           location: location,
           occupation: officer.occupation
-        }),
+        }
       });
 
-      const result: EmailSearchResult = await response.json();
+      if (error) throw error;
+      const result: EmailSearchResult = data;
       
       setEmailSearchResults(prev => ({
         ...prev,
