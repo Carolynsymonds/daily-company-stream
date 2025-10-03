@@ -16,6 +16,7 @@ export const RunHistoryTable = () => {
       const { data, error } = await supabase
         .from("scraper_runs")
         .select("*")
+        .neq("status", "running")
         .order("started_at", { ascending: false })
         .limit(20);
 
