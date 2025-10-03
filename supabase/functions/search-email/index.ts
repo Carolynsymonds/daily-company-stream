@@ -102,7 +102,11 @@ Deno.serve(async (req) => {
       finalUrl: searchUrl.toString()
     });
 
-    console.log('RocketReach Search URL:', searchUrl.toString());
+    console.log('=== RocketReach Search URL ===');
+    console.log('Full URL:', searchUrl.toString());
+    console.log('Base URL:', searchUrl.origin + searchUrl.pathname);
+    console.log('Query Parameters:', Object.fromEntries(searchUrl.searchParams));
+    console.log('==============================');
 
     const response = await fetch(searchUrl.toString(), {
       method: 'GET',

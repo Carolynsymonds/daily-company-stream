@@ -202,7 +202,7 @@ async function fetchAndStoreOfficers(
       });
     } else {
       await log('info', `Successfully stored ${insertedOfficers?.length || officersToInsert.length} officers for company ${companyNumber}:`, {
-        inserted_officers: insertedOfficers?.map(o => ({
+        inserted_officers: insertedOfficers?.map((o: { id: string; name: string; officer_role: string }) => ({
           id: o.id,
           name: o.name,
           role: o.officer_role
@@ -541,6 +541,12 @@ Deno.serve(async (req) => {
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('Missing Supabase credentials for error handler');
+        throw error;
+      }
+      
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
       // Get runId from the request body
