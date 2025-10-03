@@ -233,40 +233,33 @@ Deno.serve(async (req) => {
         
         // Get full profile details including emails
         let fullProfileData: any = null;
-        let detailedEmails: any[] = [];
+        let detailedEmails: string[] = [];
         
         if (profile.id) {
           fullProfileData = await getProfileDetails(profile.id);
           if (fullProfileData && fullProfileData.emails && Array.isArray(fullProfileData.emails)) {
-            detailedEmails = fullProfileData.emails;
-            console.log('📧 Full email details retrieved:', detailedEmails);
+            // Extract actual email addresses from the detailed response objects
+            detailedEmails = fullProfileData.emails.map((e: any) => 
+              typeof e === 'string' ? e : e.email
+            ).filter(Boolean);
+            console.log('📧 Full email details retrieved:', fullProfileData.emails);
+            console.log('📧 Extracted email addresses:', detailedEmails);
           }
         }
         
-        // Fallback to teaser data if full profile lookup fails
-        const emails = profile.teaser?.emails || [];
-        const professionalEmails = profile.teaser?.professional_emails || [];
-        const personalEmails = profile.teaser?.personal_emails || [];
+        // Fallback to teaser data ONLY if profile lookup failed or returned no emails
         const phones = profile.teaser?.phones || [];
         const preview = profile.teaser?.preview || [];
         
-        // Combine all available emails from teaser
-        const allTeaserEmails = [...emails, ...professionalEmails, ...personalEmails];
-        
         console.log('Contact info extracted:', {
-          teaserEmails: allTeaserEmails.length,
           detailedEmails: detailedEmails.length,
           phones: phones.length,
           hasLinkedIn: !!profile.linkedin_url,
           preview: preview.length
         });
         
-        // Use detailed emails if available, otherwise fall back to teaser emails
-        // Extract email strings from objects if they're in object format
-        const finalEmails = detailedEmails.length > 0 ? 
-          detailedEmails.map(e => typeof e === 'string' ? e : e.email) : 
-          allTeaserEmails;
-        
+        // Use detailed emails from lookup if available
+        const finalEmails = detailedEmails.length > 0 ? detailedEmails : [];
         const primaryEmail = finalEmails.length > 0 ? finalEmails[0] :
           (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined);
         
