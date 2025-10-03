@@ -45,9 +45,6 @@ export const ScraperControls = () => {
           <Calendar className="h-5 w-5" />
           Scraper Controls
         </CardTitle>
-        <CardDescription>
-          Fetch newly incorporated companies from Companies House API
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
