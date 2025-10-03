@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft, Mail, Search, Loader2, Filter } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft, Mail, Search, Loader2, Filter, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Company {
   id: string;
@@ -83,6 +84,7 @@ export const CompaniesPage = () => {
   const [filterByEmail, setFilterByEmail] = useState(false);
   const [filterByPhone, setFilterByPhone] = useState(false);
   const [filterByLinkedIn, setFilterByLinkedIn] = useState(false);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -153,6 +155,19 @@ export const CompaniesPage = () => {
     enabled: !!runId,
   });
 
+  // Fetch SIC codes for descriptions
+  const { data: sicCodes } = useQuery({
+    queryKey: ["sic-codes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sic_codes")
+        .select("*");
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: runInfo } = useQuery({
     queryKey: ["run-info", runId],
     queryFn: async () => {
@@ -221,6 +236,12 @@ export const CompaniesPage = () => {
     ];
     
     return `${monthNames[dateOfBirth.month - 1]} ${dateOfBirth.year}`;
+  };
+
+  const getSicCodeDescription = (code: string) => {
+    if (!sicCodes) return code;
+    const sicCode = sicCodes.find(sic => sic.code === code);
+    return sicCode ? `${code} - ${sicCode.description}` : code;
   };
 
   const searchEmail = async (officer: Officer) => {
@@ -347,8 +368,18 @@ export const CompaniesPage = () => {
     const matchesPhone = !filterByPhone || hasContactInfo(company, 'phone');
     const matchesLinkedIn = !filterByLinkedIn || hasContactInfo(company, 'linkedin');
     
-    return matchesEmail && matchesPhone && matchesLinkedIn;
-  });
+     return matchesEmail && matchesPhone && matchesLinkedIn;
+   });
+
+   const toggleCompanyExpansion = (companyId: string) => {
+     const newExpanded = new Set(expandedCompanies);
+     if (newExpanded.has(companyId)) {
+       newExpanded.delete(companyId);
+     } else {
+       newExpanded.add(companyId);
+     }
+     setExpandedCompanies(newExpanded);
+   };
 
   if (isLoading) {
     return (
@@ -458,247 +489,290 @@ export const CompaniesPage = () => {
         </div>
 
         {/* Companies List */}
-        <div className="space-y-6">
-          {filteredCompanies?.map((company) => (
-            <div key={company.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="space-y-4">
-                {/* Company Name */}
-                <h2 className="text-lg font-semibold mb-1">
-                  <a 
-                    className="text-blue-600 hover:text-blue-800 hover:underline" 
-                    href={`https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {company.company_name}
-                    <span className="sr-only">(link opens a new window)</span>
-                  </a>
-                </h2>
-                
-                {/* Status */}
-                <p className="mb-2">
-                  <span className="font-semibold capitalize">
-                    {company.company_status}
-                  </span>
-                </p>
-                
-                {/* Company Details List */}
-                <ul className="text-sm space-y-1 list-none pl-0">
-                  <li>{company.company_type === "ltd" ? "Private limited company" : company.company_type || ""}</li>
-                  <li></li>
-                  <li>
-                    {company.company_number} - Incorporated on {format(new Date(company.date_of_creation), "d MMMM yyyy")}
-                  </li>
-                  <li></li>
-                  <li>{formatAddress(company.registered_office_address)}</li>
-                  {company.sic_codes && company.sic_codes.length > 0 && (
-                    <li>SIC codes - {company.sic_codes.join(", ")}</li>
-                  )}
-                </ul>
-
-                {/* Officers Section */}
-                {company.officers && company.officers.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h3 className="text-md font-semibold mb-3">Officers</h3>
-                    <div className="space-y-4">
-                      {company.officers.map((officer) => {
-                        const isSearching = searchingEmails.has(officer.id);
-                        const emailResult = emailSearchResults[officer.id];
-                        
-                        return (
-                          <div key={officer.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="space-y-2">
-                              {/* Officer Name and Email Search Button */}
-                              <div className="flex items-start justify-between">
-                                <h4 className="font-semibold text-lg">{officer.name}</h4>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => searchEmail(officer)}
-                                  disabled={isSearching}
-                                  className="h-8 px-3 text-xs"
-                                >
-                                  {isSearching ? (
-                                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                  ) : (
-                                    <Search className="h-3 w-3 mr-1" />
-                                  )}
-                                  Find Email
-                                </Button>
-                              </div>
-                              
-                              {/* Role and Appointment */}
-                              <div className="flex flex-wrap gap-2">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                                  {officer.officer_role}
-                                </span>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  Appointed: {format(new Date(officer.appointed_on), "d MMMM yyyy")}
-                                </span>
-                                {officer.is_pre_1992_appointment && (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Pre-1992 Appointment
-                                  </span>
-                                )}
-                              </div>
-
-                            {/* Personal Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                              {officer.occupation && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Occupation:</span>
-                                  <span className="ml-2 text-gray-600">{officer.occupation}</span>
-                                </div>
-                              )}
-                              {officer.nationality && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Nationality:</span>
-                                  <span className="ml-2 text-gray-600">{officer.nationality}</span>
-                                </div>
-                              )}
-                              {officer.country_of_residence && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Country of Residence:</span>
-                                  <span className="ml-2 text-gray-600">{officer.country_of_residence}</span>
-                                </div>
-                              )}
-                              {officer.person_number && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Person Number:</span>
-                                  <span className="ml-2 text-gray-600 font-mono">{officer.person_number}</span>
-                                </div>
-                              )}
-                              {officer.date_of_birth && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Date of Birth:</span>
-                                  <span className="ml-2 text-gray-600">{formatOfficerDateOfBirth(officer.date_of_birth)}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Address */}
-                            {officer.address && (
-                              <div className="mt-2">
-                                <span className="font-medium text-gray-700 text-sm">Address:</span>
-                                <p className="text-sm text-gray-600 mt-1">{formatOfficerAddress(officer.address)}</p>
-                              </div>
+        <div className="space-y-3">
+          {filteredCompanies?.map((company) => {
+            const isExpanded = expandedCompanies.has(company.id);
+            
+            return (
+              <div key={company.id} className="border border-gray-200 rounded-lg">
+                <Collapsible open={isExpanded} onOpenChange={() => toggleCompanyExpansion(company.id)}>
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full p-4 text-left hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <h2 className="text-lg font-semibold text-gray-900">
+                            {company.company_name}
+                          </h2>
+                          {/* Contact badges */}
+                          <div className="flex items-center gap-1">
+                            {hasContactInfo(company, 'email') && (
+                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-200">
+                                <Mail className="h-3 w-3 mr-1" />
+                                Email
+                              </Badge>
                             )}
-
-                            {/* Email Search Results */}
-                            {emailResult && (
-                              <div className="mt-3 p-3 bg-white rounded border border-gray-200 space-y-2">
-                                {/* Email */}
-                                <div className="flex items-start gap-2">
-                                  <Mail className="h-4 w-4 mt-0.5 text-gray-600" />
-                                  <div className="flex-1">
-                                    <span className="font-medium text-sm text-gray-700">Email: </span>
-                                    {emailResult.emails && emailResult.emails.length > 0 ? (
-                                      <div className="space-y-0.5">
-                                        {emailResult.emails.map((email, idx) => (
-                                          <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
-                                            {email}
-                                          </a>
-                                        ))}
-                                      </div>
-                                    ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
-                                      <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
-                                        {emailResult.email}
-                                      </a>
-                                    ) : (
-                                      <span className="text-sm text-gray-500 italic">Not available</span>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Phone */}
-                                <div className="flex items-start gap-2">
-                                  <svg className="h-4 w-4 mt-0.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                  </svg>
-                                  <div className="flex-1">
-                                    <span className="font-medium text-sm text-gray-700">Phone: </span>
-                                    {emailResult.phones && emailResult.phones.length > 0 ? (
-                                      <div className="space-y-0.5">
-                                        {emailResult.phones.map((phone, idx) => (
-                                          <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
-                                            {phone}
-                                          </a>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <span className="text-sm text-gray-500 italic">Not available</span>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* LinkedIn */}
-                                <div className="flex items-start gap-2">
-                                  <ExternalLink className="h-4 w-4 mt-0.5 text-gray-600" />
-                                  <div className="flex-1">
-                                    <span className="font-medium text-sm text-gray-700">LinkedIn: </span>
-                                    {emailResult.linkedin ? (
-                                      <a 
-                                        href={emailResult.linkedin} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-blue-600 hover:underline"
-                                      >
-                                        View Profile
-                                      </a>
-                                    ) : (
-                                      <span className="text-sm text-gray-500 italic">Not available</span>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Error/Info message */}
-                                {emailResult.error && (
-                                  <div className="text-xs text-amber-600 italic pt-1 border-t">
-                                    {emailResult.error}
-                                  </div>
-                                )}
-                              </div>
+                            {hasContactInfo(company, 'phone') && (
+                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                Phone
+                              </Badge>
                             )}
-
-                            {/* Links */}
-                            {officer.links && (
-                              <div className="mt-3 pt-2 border-t border-gray-300">
-                                <div className="flex flex-wrap gap-2">
-                                  {officer.links.self && (
-                                    <a
-                                      href={`https://find-and-update.company-information.service.gov.uk${officer.links.self}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-                                    >
-                                      <ExternalLink className="h-3 w-3 mr-1" />
-                                      View Appointment
-                                    </a>
-                                  )}
-                                  {officer.links.officer?.appointments && (
-                                    <a
-                                      href={`https://find-and-update.company-information.service.gov.uk${officer.links.officer.appointments}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
-                                    >
-                                      <ExternalLink className="h-3 w-3 mr-1" />
-                                      All Appointments
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
+                            {hasContactInfo(company, 'linkedin') && (
+                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                LinkedIn
+                              </Badge>
                             )}
                           </div>
                         </div>
-                        );
-                      })}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500 capitalize">
+                            {company.company_status}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-gray-500" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-4 border-t border-gray-200">
+                      {/* Company Details */}
+                      <div className="space-y-2">
+                      
+                        
+                        {/* Status */}
+                        <p className="mb-2">
+                          <span className="font-semibold capitalize">
+                            {company.company_status}
+                          </span>
+                        </p>
+                        
+                        {/* Company Details List */}
+                        <ul className="text-sm space-y-1 list-none pl-0">
+                          <li>{company.company_type === "ltd" ? "Private limited company" : company.company_type || ""}</li>
+                          <li>
+                            {company.company_number} - Incorporated on {format(new Date(company.date_of_creation), "d MMMM yyyy")}
+                          </li>
+                          <li>{formatAddress(company.registered_office_address)}</li>
+                          {company.sic_codes && company.sic_codes.length > 0 && (
+                            <li>SIC codes - {company.sic_codes.map(code => getSicCodeDescription(code)).join(", ")}</li>
+                          )}
+                        </ul>
+                      </div>
+
+                      {/* Officers Section */}
+                      {company.officers && company.officers.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <h3 className="text-md font-semibold mb-3">Officers</h3>
+                          <div className="space-y-4">
+                            {company.officers.map((officer) => {
+                              const isSearching = searchingEmails.has(officer.id);
+                              const emailResult = emailSearchResults[officer.id];
+                              
+                              return (
+                                <div key={officer.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                  <div className="space-y-2">
+                                    {/* Officer Name and Email Search Button */}
+                                    <div className="flex items-start justify-between">
+                                      <h4 className="font-semibold text-lg">{officer.name}</h4>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => searchEmail(officer)}
+                                        disabled={isSearching}
+                                        className="h-8 px-3 text-xs"
+                                      >
+                                        {isSearching ? (
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                        ) : (
+                                          <Search className="h-3 w-3 mr-1" />
+                                        )}
+                                        Find Email
+                                      </Button>
+                                    </div>
+                                    
+                                    {/* Role and Appointment */}
+                                    <div className="flex flex-wrap gap-2">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                        {officer.officer_role}
+                                      </span>
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Appointed: {format(new Date(officer.appointed_on), "d MMMM yyyy")}
+                                      </span>
+                                      {officer.is_pre_1992_appointment && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                          Pre-1992 Appointment
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Personal Details */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                      {officer.occupation && (
+                                        <div>
+                                          <span className="font-medium text-gray-700">Occupation:</span>
+                                          <span className="ml-2 text-gray-600">{officer.occupation}</span>
+                                        </div>
+                                      )}
+                                      {officer.nationality && (
+                                        <div>
+                                          <span className="font-medium text-gray-700">Nationality:</span>
+                                          <span className="ml-2 text-gray-600">{officer.nationality}</span>
+                                        </div>
+                                      )}
+                                      {officer.country_of_residence && (
+                                        <div>
+                                          <span className="font-medium text-gray-700">Country of Residence:</span>
+                                          <span className="ml-2 text-gray-600">{officer.country_of_residence}</span>
+                                        </div>
+                                      )}
+                                      {officer.person_number && (
+                                        <div>
+                                          <span className="font-medium text-gray-700">Person Number:</span>
+                                          <span className="ml-2 text-gray-600 font-mono">{officer.person_number}</span>
+                                        </div>
+                                      )}
+                                      {officer.date_of_birth && (
+                                        <div>
+                                          <span className="font-medium text-gray-700">Date of Birth:</span>
+                                          <span className="ml-2 text-gray-600">{formatOfficerDateOfBirth(officer.date_of_birth)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Address */}
+                                    {officer.address && (
+                                      <div className="mt-2">
+                                        <span className="font-medium text-gray-700 text-sm">Address:</span>
+                                        <p className="text-sm text-gray-600 mt-1">{formatOfficerAddress(officer.address)}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Email Search Results */}
+                                    {emailResult && (
+                                      <div className="mt-3 p-3 bg-white rounded border border-gray-200 space-y-2">
+                                        {/* Email */}
+                                        <div className="flex items-start gap-2">
+                                          <Mail className="h-4 w-4 mt-0.5 text-gray-600" />
+                                          <div className="flex-1">
+                                            <span className="font-medium text-sm text-gray-700">Email: </span>
+                                            {emailResult.emails && emailResult.emails.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {emailResult.emails.map((email, idx) => (
+                                                  <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
+                                                    {email}
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
+                                              <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
+                                                {emailResult.email}
+                                              </a>
+                                            ) : (
+                                              <span className="text-sm text-gray-500 italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Phone */}
+                                        <div className="flex items-start gap-2">
+                                          <svg className="h-4 w-4 mt-0.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                          </svg>
+                                          <div className="flex-1">
+                                            <span className="font-medium text-sm text-gray-700">Phone: </span>
+                                            {emailResult.phones && emailResult.phones.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {emailResult.phones.map((phone, idx) => (
+                                                  <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
+                                                    {phone}
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm text-gray-500 italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* LinkedIn */}
+                                        <div className="flex items-start gap-2">
+                                          <ExternalLink className="h-4 w-4 mt-0.5 text-gray-600" />
+                                          <div className="flex-1">
+                                            <span className="font-medium text-sm text-gray-700">LinkedIn: </span>
+                                            {emailResult.linkedin ? (
+                                              <a 
+                                                href={emailResult.linkedin} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 hover:underline"
+                                              >
+                                                View Profile
+                                              </a>
+                                            ) : (
+                                              <span className="text-sm text-gray-500 italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Error/Info message */}
+                                        {emailResult.error && (
+                                          <div className="text-xs text-amber-600 italic pt-1 border-t">
+                                            {emailResult.error}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Links */}
+                                    {officer.links && (
+                                      <div className="mt-3 pt-2 border-t border-gray-300">
+                                        <div className="flex flex-wrap gap-2">
+                                          {officer.links.self && (
+                                            <a
+                                              href={`https://find-and-update.company-information.service.gov.uk${officer.links.self}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                            >
+                                              <ExternalLink className="h-3 w-3 mr-1" />
+                                              View Appointment
+                                            </a>
+                                          )}
+                                          {officer.links.officer?.appointments && (
+                                            <a
+                                              href={`https://find-and-update.company-information.service.gov.uk${officer.links.officer.appointments}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                                            >
+                                              <ExternalLink className="h-3 w-3 mr-1" />
+                                              All Appointments
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

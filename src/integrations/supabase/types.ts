@@ -217,6 +217,27 @@ export type Database = {
           },
         ]
       }
+      sic_codes: {
+        Row: {
+          id: string
+          code: string
+          description: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          description: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          description?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       scraper_runs: {
         Row: {
           completed_at: string | null
