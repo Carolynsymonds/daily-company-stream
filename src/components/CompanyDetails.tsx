@@ -4,10 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, MapPin, Calendar, Hash, ExternalLink, Users, User, Mail, Search, Loader2 } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, Users, User, Mail, Search, Loader2, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 
 interface CompanyDetailsProps {
@@ -84,6 +86,10 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [emailSearchResults, setEmailSearchResults] = useState<Record<string, EmailSearchResult>>({});
   const [searchingEmails, setSearchingEmails] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterByEmail, setFilterByEmail] = useState(false);
+  const [filterByPhone, setFilterByPhone] = useState(false);
+  const [filterByLinkedIn, setFilterByLinkedIn] = useState(false);
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -190,7 +196,8 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
   };
 
   const getOfficersForCompany = (companyId: string) => {
-    return officers?.filter(officer => officer.company_id === companyId) || [];
+    if (!officers) return [];
+    return officers.filter(officer => officer.company_id === companyId);
   };
 
   const toggleCompanyExpansion = (companyId: string) => {
@@ -255,6 +262,52 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
     }
   };
 
+  const hasContactInfo = (companyId: string, type?: 'email' | 'phone' | 'linkedin') => {
+    const companyOfficers = getOfficersForCompany(companyId);
+    
+    return companyOfficers.some(officer => {
+      const result = emailSearchResults[officer.id];
+      if (!result) return false;
+      
+      if (!type) {
+        // Any contact info
+        return (result.emails && result.emails.length > 0) ||
+               (result.email && !result.email.startsWith('[Hidden')) ||
+               (result.phones && result.phones.length > 0) ||
+               result.linkedin;
+      }
+      
+      if (type === 'email') {
+        return (result.emails && result.emails.length > 0) ||
+               (result.email && !result.email.startsWith('[Hidden'));
+      }
+      
+      if (type === 'phone') {
+        return result.phones && result.phones.length > 0;
+      }
+      
+      if (type === 'linkedin') {
+        return !!result.linkedin;
+      }
+      
+      return false;
+    });
+  };
+
+  const filteredCompanies = companies?.filter(company => {
+    // If no filters are active, show all companies
+    if (!filterByEmail && !filterByPhone && !filterByLinkedIn) {
+      return true;
+    }
+    
+    // Check if company has the filtered contact types
+    const matchesEmail = !filterByEmail || hasContactInfo(company.id, 'email');
+    const matchesPhone = !filterByPhone || hasContactInfo(company.id, 'phone');
+    const matchesLinkedIn = !filterByLinkedIn || hasContactInfo(company.id, 'linkedin');
+    
+    return matchesEmail && matchesPhone && matchesLinkedIn;
+  });
+
   if (isLoading) {
     return (
       <Card>
@@ -294,18 +347,64 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Company Details
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            <CardTitle>Company Details</CardTitle>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            Filter by Contact
+          </Button>
+        </div>
+        {showFilters && (
+          <div className="flex flex-wrap gap-4 mt-3 p-3 bg-gray-50 rounded-lg border">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-email"
+                checked={filterByEmail}
+                onCheckedChange={(checked) => setFilterByEmail(!!checked)}
+              />
+              <Label htmlFor="filter-email" className="text-sm cursor-pointer">
+                Has Email
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-phone"
+                checked={filterByPhone}
+                onCheckedChange={(checked) => setFilterByPhone(!!checked)}
+              />
+              <Label htmlFor="filter-phone" className="text-sm cursor-pointer">
+                Has Phone
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="filter-linkedin"
+                checked={filterByLinkedIn}
+                onCheckedChange={(checked) => setFilterByLinkedIn(!!checked)}
+              />
+              <Label htmlFor="filter-linkedin" className="text-sm cursor-pointer">
+                Has LinkedIn
+              </Label>
+            </div>
+          </div>
+        )}
         <CardDescription>
-          {companies.length} companies found for this run
+          {filteredCompanies?.length || 0} {filteredCompanies?.length === 1 ? 'company' : 'companies'} found
+          {(filterByEmail || filterByPhone || filterByLinkedIn) && ' (filtered)'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[600px] w-full">
           <div className="space-y-4">
-            {companies.map((company) => {
+            {filteredCompanies?.map((company) => {
               const companyOfficers = getOfficersForCompany(company.id);
               const isExpanded = expandedCompanies.has(company.id);
               
