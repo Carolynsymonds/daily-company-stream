@@ -39,6 +39,9 @@ interface RocketReachResponse {
 
 interface EmailSearchResult {
   email?: string;
+  emails?: string[];
+  phones?: string[];
+  linkedin?: string;
   confidence?: number;
   source?: string;
   found: boolean;
@@ -185,25 +188,33 @@ Deno.serve(async (req) => {
     if (data.profiles && data.profiles.length > 0) {
       const profile = data.profiles[0];
       
-      // Check if we have actual email addresses
+      // Extract all contact information
       const emails = profile.teaser?.emails || [];
       const professionalEmails = profile.teaser?.professional_emails || [];
       const personalEmails = profile.teaser?.personal_emails || [];
+      const phones = profile.teaser?.phones || [];
+      const preview = profile.teaser?.preview || [];
       
       // Combine all available emails
       const allEmails = [...emails, ...professionalEmails, ...personalEmails];
       
-      if (allEmails.length > 0) {
+      const hasContactInfo = allEmails.length > 0 || phones.length > 0 || profile.linkedin_url;
+      
+      if (hasContactInfo) {
         return new Response(
           JSON.stringify({
             found: true,
-            email: allEmails[0],
+            email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+            emails: allEmails.length > 0 ? allEmails : undefined,
+            phones: phones.length > 0 ? phones : undefined,
+            linkedin: profile.linkedin_url,
             source: 'RocketReach',
+            error: allEmails.length === 0 && preview.length > 0 ? 'Email found but requires RocketReach credits to reveal' : undefined,
             profile: {
               name: profile.name,
               title: profile.current_title,
               employer: profile.current_employer,
-              linkedin: profile.linkedin_url
+              location: profile.location
             }
           }),
           {
@@ -212,19 +223,16 @@ Deno.serve(async (req) => {
           }
         );
       } else {
-        // Profile found but no email available (may require credits)
-        const preview = profile.teaser?.preview || [];
+        // Profile found but no contact info available
         return new Response(
           JSON.stringify({
-            found: true,
-            email: preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined,
-            source: 'RocketReach',
-            error: 'Email found but requires RocketReach credits to reveal',
+            found: false,
+            error: 'Profile found but no contact information available',
             profile: {
               name: profile.name,
               title: profile.current_title,
               employer: profile.current_employer,
-              linkedin: profile.linkedin_url
+              location: profile.location
             }
           }),
           {
