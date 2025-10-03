@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
 
   try {
     const { name, location, company_sic_code }: EmailSearchRequest = await req.json();
+    
+    console.log('=== Email Search Function Invoked ===');
+    console.log('Request body:', { name, location, company_sic_code });
 
     if (!name) {
       return new Response(
@@ -128,6 +131,8 @@ Deno.serve(async (req) => {
     console.log('Base URL:', searchUrl.origin + searchUrl.pathname);
     console.log('Query Parameters:', Object.fromEntries(searchUrl.searchParams));
     console.log('==============================');
+    
+    console.log('Making RocketReach API request...');
 
     const response = await fetch(searchUrl.toString(), {
       method: 'GET',
@@ -191,9 +196,11 @@ Deno.serve(async (req) => {
     }
     
     console.log('RocketReach API Response Data:', data);
+    console.log('Number of profiles found:', data.profiles?.length || 0);
 
     // Check if we have profiles
     if (data.profiles && data.profiles.length > 0) {
+      console.log('Processing first profile...');
       const profile = data.profiles[0];
       
       // Extract all contact information
@@ -205,6 +212,13 @@ Deno.serve(async (req) => {
       
       // Combine all available emails
       const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+      
+      console.log('Contact info extracted:', {
+        emails: allEmails.length,
+        phones: phones.length,
+        hasLinkedIn: !!profile.linkedin_url,
+        preview: preview.length
+      });
       
       // Always return if we found a profile (even if some data requires credits)
       return new Response(
@@ -229,9 +243,11 @@ Deno.serve(async (req) => {
         }
       );
     } else {
+      console.log('No profiles found in initial search');
+      
       // If no results found and we used company_sic_code, try without it
       if (company_sic_code) {
-        console.log('No results with company_sic_code, trying without it...');
+        console.log('No results with company_sic_code, trying fallback search without it...');
         
         // Build search URL without company_sic_code
         const fallbackSearchUrl = new URL('https://api.rocketreach.co/v1/api/search');
@@ -244,6 +260,7 @@ Deno.serve(async (req) => {
         }
 
         console.log('Fallback search URL:', fallbackSearchUrl.toString());
+        console.log('Making fallback RocketReach API request...');
 
         const fallbackResponse = await fetch(fallbackSearchUrl.toString(), {
           method: 'GET',
@@ -254,14 +271,17 @@ Deno.serve(async (req) => {
         });
 
         if (fallbackResponse.ok) {
+          console.log('Fallback response status:', fallbackResponse.status);
           const fallbackResponseText = await fallbackResponse.text();
           
           if (fallbackResponseText && fallbackResponseText.trim() !== '') {
             try {
               const fallbackData: RocketReachResponse = JSON.parse(fallbackResponseText);
               console.log('Fallback search results:', fallbackData);
+              console.log('Fallback profiles found:', fallbackData.profiles?.length || 0);
 
               if (fallbackData.profiles && fallbackData.profiles.length > 0) {
+                console.log('Processing fallback profile...');
                 const profile = fallbackData.profiles[0];
                 
                 // Extract all contact information
@@ -273,6 +293,12 @@ Deno.serve(async (req) => {
                 
                 // Combine all available emails
                 const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+                
+                console.log('Fallback contact info extracted:', {
+                  emails: allEmails.length,
+                  phones: phones.length,
+                  hasLinkedIn: !!profile.linkedin_url
+                });
                 
                 return new Response(
                   JSON.stringify({
@@ -303,6 +329,7 @@ Deno.serve(async (req) => {
         }
       }
 
+      console.log('Returning: No profiles found after all attempts');
       return new Response(
         JSON.stringify({
           found: false,
@@ -316,7 +343,11 @@ Deno.serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Email search error:', error);
+    console.error('=== Email Search Function Error ===');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('===================================');
     return new Response(
       JSON.stringify({
         found: false,
