@@ -134,16 +134,21 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
           // Convert contacts to the format expected by the component
           const contactsMap: Record<string, EmailSearchResult> = {};
           contacts.forEach(contact => {
-            // Handle phone data - might be string or object from old data
+            // Handle phone data - database stores it as text (might be JSON string or plain string)
             let phoneData: Array<string | { number: string; is_premium?: boolean }> | undefined;
             if (contact.phone) {
               try {
-                // Try to parse as JSON in case it's stored as object
-                const parsed = typeof contact.phone === 'string' ? JSON.parse(contact.phone) : contact.phone;
-                phoneData = [parsed];
+                // Try to parse as JSON in case it's stored as a JSON string
+                const parsed = JSON.parse(contact.phone);
+                // If successfully parsed and has a number property, use the object
+                if (typeof parsed === 'object' && parsed !== null && 'number' in parsed) {
+                  phoneData = [parsed.number]; // Extract just the number as string
+                } else {
+                  phoneData = [contact.phone];
+                }
               } catch {
                 // If parsing fails, it's a plain string
-                phoneData = [contact.phone as string];
+                phoneData = [contact.phone];
               }
             }
             
