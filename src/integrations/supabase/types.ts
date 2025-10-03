@@ -14,6 +14,174 @@ export type Database = {
   }
   public: {
     Tables: {
+      companies: {
+        Row: {
+          company_name: string
+          company_number: string
+          company_status: string
+          company_type: string | null
+          created_at: string
+          date_of_creation: string
+          id: string
+          registered_office_address: Json | null
+          run_id: string
+          sic_codes: string[] | null
+        }
+        Insert: {
+          company_name: string
+          company_number: string
+          company_status: string
+          company_type?: string | null
+          created_at?: string
+          date_of_creation: string
+          id?: string
+          registered_office_address?: Json | null
+          run_id: string
+          sic_codes?: string[] | null
+        }
+        Update: {
+          company_name?: string
+          company_number?: string
+          company_status?: string
+          company_type?: string | null
+          created_at?: string
+          date_of_creation?: string
+          id?: string
+          registered_office_address?: Json | null
+          run_id?: string
+          sic_codes?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "scraper_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      officer_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          error_message: string | null
+          found: boolean
+          id: string
+          linkedin_url: string | null
+          officer_id: string
+          phone: string | null
+          profile_employer: string | null
+          profile_location: string | null
+          profile_name: string | null
+          profile_title: string | null
+          searched_at: string
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          found?: boolean
+          id?: string
+          linkedin_url?: string | null
+          officer_id: string
+          phone?: string | null
+          profile_employer?: string | null
+          profile_location?: string | null
+          profile_name?: string | null
+          profile_title?: string | null
+          searched_at?: string
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          found?: boolean
+          id?: string
+          linkedin_url?: string | null
+          officer_id?: string
+          phone?: string | null
+          profile_employer?: string | null
+          profile_location?: string | null
+          profile_name?: string | null
+          profile_title?: string | null
+          searched_at?: string
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "officer_contacts_officer_id_fkey"
+            columns: ["officer_id"]
+            isOneToOne: true
+            referencedRelation: "officers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      officers: {
+        Row: {
+          address: Json | null
+          appointed_on: string | null
+          company_id: string
+          country_of_residence: string | null
+          created_at: string
+          date_of_birth: Json | null
+          id: string
+          is_pre_1992_appointment: boolean | null
+          links: Json | null
+          name: string
+          nationality: string | null
+          occupation: string | null
+          officer_role: string
+          person_number: string | null
+        }
+        Insert: {
+          address?: Json | null
+          appointed_on?: string | null
+          company_id: string
+          country_of_residence?: string | null
+          created_at?: string
+          date_of_birth?: Json | null
+          id?: string
+          is_pre_1992_appointment?: boolean | null
+          links?: Json | null
+          name: string
+          nationality?: string | null
+          occupation?: string | null
+          officer_role: string
+          person_number?: string | null
+        }
+        Update: {
+          address?: Json | null
+          appointed_on?: string | null
+          company_id?: string
+          country_of_residence?: string | null
+          created_at?: string
+          date_of_birth?: Json | null
+          id?: string
+          is_pre_1992_appointment?: boolean | null
+          links?: Json | null
+          name?: string
+          nationality?: string | null
+          occupation?: string | null
+          officer_role?: string
+          person_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "officers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scraper_logs: {
         Row: {
           id: string
@@ -49,112 +217,6 @@ export type Database = {
           },
         ]
       }
-          companies: {
-            Row: {
-              company_name: string
-              company_number: string
-              company_status: string
-              company_type: string | null
-              created_at: string
-              date_of_creation: string
-              id: string
-              registered_office_address: any | null
-              run_id: string
-              sic_codes: any | null
-            }
-            Insert: {
-              company_name: string
-              company_number: string
-              company_status: string
-              company_type?: string | null
-              created_at?: string
-              date_of_creation: string
-              id?: string
-              registered_office_address?: any | null
-              run_id: string
-              sic_codes?: any | null
-            }
-            Update: {
-              company_name?: string
-              company_number?: string
-              company_status?: string
-              company_type?: string | null
-              created_at?: string
-              date_of_creation?: string
-              id?: string
-              registered_office_address?: any | null
-              run_id?: string
-              sic_codes?: any | null
-            }
-            Relationships: [
-              {
-                foreignKeyName: "companies_run_id_fkey"
-                columns: ["run_id"]
-                isOneToOne: false
-                referencedRelation: "scraper_runs"
-                referencedColumns: ["id"]
-              },
-            ]
-          }
-          officers: {
-            Row: {
-              address: any | null
-              appointed_on: string
-              company_id: string
-              country_of_residence: string | null
-              created_at: string
-              date_of_birth: any | null
-              id: string
-              is_pre_1992_appointment: boolean | null
-              links: any | null
-              name: string
-              nationality: string | null
-              occupation: string | null
-              officer_role: string
-              person_number: string | null
-            }
-            Insert: {
-              address?: any | null
-              appointed_on: string
-              company_id: string
-              country_of_residence?: string | null
-              created_at?: string
-              date_of_birth?: any | null
-              id?: string
-              is_pre_1992_appointment?: boolean | null
-              links?: any | null
-              name: string
-              nationality?: string | null
-              occupation?: string | null
-              officer_role: string
-              person_number?: string | null
-            }
-            Update: {
-              address?: any | null
-              appointed_on?: string
-              company_id?: string
-              country_of_residence?: string | null
-              created_at?: string
-              date_of_birth?: any | null
-              id?: string
-              is_pre_1992_appointment?: boolean | null
-              links?: any | null
-              name?: string
-              nationality?: string | null
-              occupation?: string | null
-              officer_role?: string
-              person_number?: string | null
-            }
-            Relationships: [
-              {
-                foreignKeyName: "officers_company_id_fkey"
-                columns: ["company_id"]
-                isOneToOne: false
-                referencedRelation: "companies"
-                referencedColumns: ["id"]
-              },
-            ]
-          }
       scraper_runs: {
         Row: {
           completed_at: string | null

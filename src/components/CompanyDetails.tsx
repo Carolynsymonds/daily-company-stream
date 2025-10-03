@@ -240,6 +240,27 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       if (error) throw error;
       const result: EmailSearchResult = data;
       
+      // Save to database
+      await supabase
+        .from('officer_contacts')
+        .upsert({
+          officer_id: officerId,
+          email: result.emails && result.emails.length > 0 ? result.emails[0] : 
+                 (result.email && !result.email.startsWith('[Hidden') ? result.email : null),
+          phone: result.phones && result.phones.length > 0 ? result.phones[0] : null,
+          linkedin_url: result.linkedin || null,
+          found: result.found,
+          error_message: result.error || null,
+          source: result.source || null,
+          profile_name: result.profile?.name || null,
+          profile_title: result.profile?.title || null,
+          profile_employer: result.profile?.employer || null,
+          profile_location: result.profile?.location || null,
+          searched_at: new Date().toISOString()
+        }, {
+          onConflict: 'officer_id'
+        });
+      
       setEmailSearchResults(prev => ({
         ...prev,
         [officerId]: result
