@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft, Mail, Search, Loader2 } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, ArrowLeft, Mail, Search, Loader2, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 
@@ -78,6 +80,9 @@ export const CompaniesPage = () => {
   const navigate = useNavigate();
   const [emailSearchResults, setEmailSearchResults] = useState<Record<string, EmailSearchResult>>({});
   const [searchingEmails, setSearchingEmails] = useState<Set<string>>(new Set());
+  const [filterByEmail, setFilterByEmail] = useState(false);
+  const [filterByPhone, setFilterByPhone] = useState(false);
+  const [filterByLinkedIn, setFilterByLinkedIn] = useState(false);
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -244,6 +249,50 @@ export const CompaniesPage = () => {
     }
   };
 
+  const hasContactInfo = (company: Company & { officers: Officer[] }, type?: 'email' | 'phone' | 'linkedin') => {
+    return company.officers.some(officer => {
+      const result = emailSearchResults[officer.id];
+      if (!result) return false;
+      
+      if (!type) {
+        // Any contact info
+        return (result.emails && result.emails.length > 0) ||
+               (result.email && !result.email.startsWith('[Hidden')) ||
+               (result.phones && result.phones.length > 0) ||
+               result.linkedin;
+      }
+      
+      if (type === 'email') {
+        return (result.emails && result.emails.length > 0) ||
+               (result.email && !result.email.startsWith('[Hidden'));
+      }
+      
+      if (type === 'phone') {
+        return result.phones && result.phones.length > 0;
+      }
+      
+      if (type === 'linkedin') {
+        return !!result.linkedin;
+      }
+      
+      return false;
+    });
+  };
+
+  const filteredCompanies = companies?.filter(company => {
+    // If no filters are active, show all companies
+    if (!filterByEmail && !filterByPhone && !filterByLinkedIn) {
+      return true;
+    }
+    
+    // Check if company has the filtered contact types
+    const matchesEmail = !filterByEmail || hasContactInfo(company, 'email');
+    const matchesPhone = !filterByPhone || hasContactInfo(company, 'phone');
+    const matchesLinkedIn = !filterByLinkedIn || hasContactInfo(company, 'linkedin');
+    
+    return matchesEmail && matchesPhone && matchesLinkedIn;
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -301,22 +350,64 @@ export const CompaniesPage = () => {
             Back to Dashboard
           </Button>
           
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight">Company Details</h1>
-            <p className="text-muted-foreground text-lg">
-              {companies.length} companies found for {runInfo?.target_date && format(new Date(runInfo.target_date), "PPP")}
-            </p>
-            {runInfo && (
-              <p className="text-sm text-muted-foreground">
-                Scraped on {format(new Date(runInfo.started_at), "PPP 'at' p")}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold tracking-tight">Company Details</h1>
+              <p className="text-muted-foreground text-lg">
+                {filteredCompanies?.length || 0} companies found for {runInfo?.target_date && format(new Date(runInfo.target_date), "PPP")}
+                {(filterByEmail || filterByPhone || filterByLinkedIn) && ' (filtered)'}
               </p>
-            )}
+              {runInfo && (
+                <p className="text-sm text-muted-foreground">
+                  Scraped on {format(new Date(runInfo.started_at), "PPP 'at' p")}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Filter className="h-4 w-4" />
+                Filter by Contact
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="filter-email"
+                    checked={filterByEmail}
+                    onCheckedChange={(checked) => setFilterByEmail(!!checked)}
+                  />
+                  <Label htmlFor="filter-email" className="text-sm cursor-pointer">
+                    Has Email
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="filter-phone"
+                    checked={filterByPhone}
+                    onCheckedChange={(checked) => setFilterByPhone(!!checked)}
+                  />
+                  <Label htmlFor="filter-phone" className="text-sm cursor-pointer">
+                    Has Phone
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="filter-linkedin"
+                    checked={filterByLinkedIn}
+                    onCheckedChange={(checked) => setFilterByLinkedIn(!!checked)}
+                  />
+                  <Label htmlFor="filter-linkedin" className="text-sm cursor-pointer">
+                    Has LinkedIn
+                  </Label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Companies List */}
         <div className="space-y-6">
-          {companies.map((company) => (
+          {filteredCompanies?.map((company) => (
             <div key={company.id} className="border border-gray-200 rounded-lg p-4">
               <div className="space-y-4">
                 {/* Company Name */}
