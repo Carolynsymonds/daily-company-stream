@@ -9,7 +9,7 @@ const corsHeaders = {
 interface EmailSearchRequest {
   name: string;
   location?: string;
-  occupation?: string;
+  company_sic_code?: string;
 }
 
 interface RocketReachResponse {
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { name, location, occupation }: EmailSearchRequest = await req.json();
+    const { name, location, company_sic_code }: EmailSearchRequest = await req.json();
 
     if (!name) {
       return new Response(
@@ -97,21 +97,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build the search URL with query parameters
+    // Build the search URL with query parameters matching RocketReach format
     const searchUrl = new URL('https://api.rocketreach.co/v1/api/search');
     searchUrl.searchParams.set('name', name);
-    searchUrl.searchParams.set('page', '1');
-    searchUrl.searchParams.set('per_page', '10');
+    searchUrl.searchParams.set('start', '1');
+    searchUrl.searchParams.set('pageSize', '10');
     
     if (location) {
-      searchUrl.searchParams.set('location', location);
+      searchUrl.searchParams.set('geo[]', `"${location}"`);
+    }
+
+    // Add company SIC code if available
+    if (company_sic_code) {
+      // Extract just the SIC code number if it includes description
+      const companySicNumber = company_sic_code.split(' - ')[0];
+      searchUrl.searchParams.set('company_sic_code[]', companySicNumber);
     }
 
     console.log('RocketReach API Request Parameters:', {
       name: name,
       location: location || 'not provided',
-      page: '1',
-      per_page: '10',
+      company_sic_code: company_sic_code || 'not provided',
+      start: '1',
+      pageSize: '10',
       finalUrl: searchUrl.toString()
     });
 
@@ -221,6 +229,80 @@ Deno.serve(async (req) => {
         }
       );
     } else {
+      // If no results found and we used company_sic_code, try without it
+      if (company_sic_code) {
+        console.log('No results with company_sic_code, trying without it...');
+        
+        // Build search URL without company_sic_code
+        const fallbackSearchUrl = new URL('https://api.rocketreach.co/v1/api/search');
+        fallbackSearchUrl.searchParams.set('name', name);
+        fallbackSearchUrl.searchParams.set('start', '1');
+        fallbackSearchUrl.searchParams.set('pageSize', '10');
+        
+        if (location) {
+          fallbackSearchUrl.searchParams.set('geo[]', `"${location}"`);
+        }
+
+        console.log('Fallback search URL:', fallbackSearchUrl.toString());
+
+        const fallbackResponse = await fetch(fallbackSearchUrl.toString(), {
+          method: 'GET',
+          headers: {
+            'Api-Key': apiKey,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (fallbackResponse.ok) {
+          const fallbackResponseText = await fallbackResponse.text();
+          
+          if (fallbackResponseText && fallbackResponseText.trim() !== '') {
+            try {
+              const fallbackData: RocketReachResponse = JSON.parse(fallbackResponseText);
+              console.log('Fallback search results:', fallbackData);
+
+              if (fallbackData.profiles && fallbackData.profiles.length > 0) {
+                const profile = fallbackData.profiles[0];
+                
+                // Extract all contact information
+                const emails = profile.teaser?.emails || [];
+                const professionalEmails = profile.teaser?.professional_emails || [];
+                const personalEmails = profile.teaser?.personal_emails || [];
+                const phones = profile.teaser?.phones || [];
+                const preview = profile.teaser?.preview || [];
+                
+                // Combine all available emails
+                const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+                
+                return new Response(
+                  JSON.stringify({
+                    found: true,
+                    email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+                    emails: allEmails.length > 0 ? allEmails : undefined,
+                    phones: phones.length > 0 ? phones : undefined,
+                    linkedin: profile.linkedin_url,
+                    source: 'RocketReach (fallback search)',
+                    error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+                    profile: {
+                      name: profile.name,
+                      title: profile.current_title,
+                      employer: profile.current_employer,
+                      location: profile.location
+                    }
+                  }),
+                  {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200,
+                  }
+                );
+              }
+            } catch (parseError) {
+              console.error('Failed to parse fallback response:', parseError);
+            }
+          }
+        }
+      }
+
       return new Response(
         JSON.stringify({
           found: false,

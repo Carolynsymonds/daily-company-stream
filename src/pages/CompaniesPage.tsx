@@ -266,18 +266,22 @@ export const CompaniesPage = () => {
         location = officer.country_of_residence;
       }
 
+      // Get company SIC codes for this officer
+      const companySicCodes = companies?.find(c => c.officers?.some(o => o.id === officer.id))?.sic_codes || [];
+      const companySicCodeDescription = companySicCodes.length > 0 ? getSicCodeDescription(companySicCodes[0]) : null;
+
       console.log('Email search params:', {
         originalName: officer.name,
         searchName: searchName,
         location: location,
-        occupation: officer.occupation
+        company_sic_code: companySicCodeDescription
       });
 
       const { data, error } = await supabase.functions.invoke('search-email', {
         body: {
           name: searchName,
           location: location,
-          occupation: officer.occupation
+          company_sic_code: companySicCodeDescription
         }
       });
 
