@@ -37,7 +37,13 @@ interface RocketReachResponse {
 
 interface EmailSearchResult {
   email?: string;
-  emails?: string[];
+  emails?: Array<string | {
+    email: string;
+    smtp_valid?: string;
+    type?: string;
+    last_validation_check?: string;
+    grade?: string;
+  }>;
   phones?: Array<string | { number: string; is_premium?: boolean }>;
   linkedin?: string;
   confidence?: number;
@@ -134,6 +140,8 @@ Deno.serve(async (req) => {
         'Api-Key': `${apiKey.substring(0, 10)}...`,
         'Accept': 'application/json'
       });
+
+    
       console.log('==============================');
 
       const response = await fetch(searchUrl.toString(), {
@@ -169,8 +177,48 @@ Deno.serve(async (req) => {
       }
     };
 
+    // Helper function to get full profile details including emails
+    const getProfileDetails = async (profileId: number): Promise<any> => {
+      const lookupUrl = 'https://api.rocketreach.co/v1/api/lookupProfile';
+      
+      console.log('🔍 Looking up full profile details for ID:', profileId);
+      console.log('📋 Lookup URL:', lookupUrl);
+      
+      try {
+        const response = await fetch(lookupUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'API-Key': apiKey,
+          },
+          body: JSON.stringify({ id: profileId })
+        });
+
+        console.log('Profile lookup response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Profile lookup error:', errorText);
+          return null;
+        }
+
+        const responseText = await response.text();
+        if (!responseText || responseText.trim() === '') {
+          console.error('Empty response from profile lookup');
+          return null;
+        }
+
+        const profileData = JSON.parse(responseText);
+        console.log('📊 Full profile data received:', profileData);
+        return profileData;
+      } catch (error) {
+        console.error('Profile lookup failed:', error);
+        return null;
+      }
+    };
+
     // Helper function to process search results
-    const processResults = (data: RocketReachResponse, source: string, searchParams?: Record<string, string>): Response | null => {
+    const processResults = async (data: RocketReachResponse, source: string, searchParams?: Record<string, string>): Promise<Response | null> => {
       console.log(`Processing results from ${source}...`);
       console.log('Profiles in response:', data.profiles?.length || 0);
       
@@ -184,33 +232,53 @@ Deno.serve(async (req) => {
           location: profile.location
         });
         
-        // Extract all contact information
+        // Get full profile details including emails
+        let fullProfileData: any = null;
+        let detailedEmails: any[] = [];
+        
+        if (profile.id) {
+          fullProfileData = await getProfileDetails(profile.id);
+          if (fullProfileData && fullProfileData.emails && Array.isArray(fullProfileData.emails)) {
+            detailedEmails = fullProfileData.emails;
+            console.log('📧 Full email details retrieved:', detailedEmails);
+          }
+        }
+        
+        // Fallback to teaser data if full profile lookup fails
         const emails = profile.teaser?.emails || [];
         const professionalEmails = profile.teaser?.professional_emails || [];
         const personalEmails = profile.teaser?.personal_emails || [];
         const phones = profile.teaser?.phones || [];
         const preview = profile.teaser?.preview || [];
         
-        // Combine all available emails
-        const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+        // Combine all available emails from teaser
+        const allTeaserEmails = [...emails, ...professionalEmails, ...personalEmails];
         
         console.log('Contact info extracted:', {
-          emails: allEmails.length,
+          teaserEmails: allTeaserEmails.length,
+          detailedEmails: detailedEmails.length,
           phones: phones.length,
           hasLinkedIn: !!profile.linkedin_url,
           preview: preview.length
         });
-        console.log('Email details:', { allEmails, preview });
-        console.log('Phone details:', phones);
+        
+        // Use detailed emails if available, otherwise fall back to teaser emails
+        const finalEmails = detailedEmails.length > 0 ? detailedEmails : allTeaserEmails;
+        const primaryEmail = finalEmails.length > 0 ? 
+          (typeof finalEmails[0] === 'string' ? finalEmails[0] : 
+           (typeof finalEmails[0] === 'object' && finalEmails[0].email ? finalEmails[0].email : finalEmails[0])) : 
+          (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined);
+        
+        console.log('📊 Final email data:', { finalEmails, primaryEmail });
         
          const responseData = {
            found: true,
-           email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-           emails: allEmails.length > 0 ? allEmails : undefined,
+           email: primaryEmail,
+           emails: finalEmails.length > 0 ? finalEmails : undefined,
            phones: phones.length > 0 ? phones : undefined,
            linkedin: profile.linkedin_url,
            source: source,
-           error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+           error: finalEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
            profile: {
              name: profile.name,
              title: profile.current_title,
@@ -278,7 +346,7 @@ Deno.serve(async (req) => {
       const search1Data = await performSearch(search1Params, 'Search 1 (name + location + company_sic_code)');
 
       if (search1Data) {
-        const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)', search1Params);
+        const result = await processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)', search1Params);
         if (result) {
           console.log('✅ Search 1 succeeded! Returning result from Search 1');
           return result;
@@ -299,7 +367,7 @@ Deno.serve(async (req) => {
       const search2Data = await performSearch(search2Params, 'Search 2 (name + detailed_location)');
 
       if (search2Data) {
-        const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)', search2Params);
+        const result = await processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)', search2Params);
         if (result) {
           console.log('✅ Search 2 succeeded! Returning result from Search 2');
           return result;
@@ -319,7 +387,7 @@ Deno.serve(async (req) => {
     const search3Data = await performSearch(search3Params, 'Search 3 (name + location)');
 
     if (search3Data) {
-      const result = processResults(search3Data, 'RocketReach (Search 3: name + location)', search3Params);
+      const result = await processResults(search3Data, 'RocketReach (Search 3: name + location)', search3Params);
       if (result) {
         console.log('✅ Search 3 succeeded! Returning result from Search 3');
         return result;

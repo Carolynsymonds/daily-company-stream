@@ -61,7 +61,13 @@ interface Officer {
 
 interface EmailSearchResult {
   email?: string;
-  emails?: string[];
+  emails?: Array<string | {
+    email: string;
+    smtp_valid?: string;
+    type?: string;
+    last_validation_check?: string;
+    grade?: string;
+  }>;
   phones?: Array<string | { number: string; is_premium?: boolean }>;
   linkedin?: string;
   confidence?: number;
@@ -307,8 +313,9 @@ export const CompaniesPage = () => {
         .from('officer_contacts')
         .upsert({
           officer_id: officerId,
-          email: result.emails && result.emails.length > 0 ? result.emails[0] : 
-                 (result.email && !result.email.startsWith('[Hidden') ? result.email : null),
+          email: result.emails && result.emails.length > 0 ? 
+            (typeof result.emails[0] === 'string' ? result.emails[0] : result.emails[0].email) : 
+            (result.email && !result.email.startsWith('[Hidden') ? result.email : null),
           phone: result.phones && result.phones.length > 0 ? 
             (typeof result.phones[0] === 'string' ? result.phones[0] : result.phones[0].number) : null,
           linkedin_url: result.linkedin || null,
@@ -743,11 +750,37 @@ export const CompaniesPage = () => {
                                             <span className="font-medium text-sm text-gray-700">Email: </span>
                                             {emailResult.emails && emailResult.emails.length > 0 ? (
                                               <div className="space-y-0.5">
-                                                {emailResult.emails.map((email, idx) => (
-                                                  <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
-                                                    {email}
-                                                  </a>
-                                                ))}
+                                                {emailResult.emails.map((emailData, idx) => {
+                                                  const email = typeof emailData === 'string' ? emailData : emailData.email;
+                                                  const isValid = typeof emailData === 'object' ? emailData.smtp_valid : undefined;
+                                                  const emailType = typeof emailData === 'object' ? emailData.type : undefined;
+                                                  const grade = typeof emailData === 'object' ? emailData.grade : undefined;
+                                                  
+                                                  return (
+                                                    <div key={idx} className="block">
+                                                      <a href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline">
+                                                        {email}
+                                                      </a>
+                                                      {isValid && (
+                                                        <span className={`ml-2 text-xs px-1 py-0.5 rounded ${
+                                                          isValid === 'valid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                        }`}>
+                                                          {isValid}
+                                                        </span>
+                                                      )}
+                                                      {emailType && (
+                                                        <span className="ml-1 text-xs text-gray-500">
+                                                          ({emailType})
+                                                        </span>
+                                                      )}
+                                                      {grade && (
+                                                        <span className="ml-1 text-xs text-blue-600 font-medium">
+                                                          {grade}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
                                               </div>
                                             ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
                                               <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
