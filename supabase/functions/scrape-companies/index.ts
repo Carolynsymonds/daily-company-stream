@@ -58,6 +58,7 @@ interface OfficersResponse {
 
 interface SearchResponse {
   items: CompanySearchResult[];
+  hits?: number; // Total count of results
   total_results?: number;
   start_index?: number;
   items_per_page?: number;
@@ -356,6 +357,7 @@ Deno.serve(async (req) => {
 
       // Log the API response with more detailed information
       await log('info', `API Response for page ${pagesFetched + 1}:`, {
+        hits: data.hits,
         total_results: data.total_results || data.totalResults,
         start_index: data.start_index || data.startIndex,
         items_per_page: data.items_per_page || data.itemsPerPage,
@@ -370,8 +372,8 @@ Deno.serve(async (req) => {
       });
 
       if (pagesFetched === 0) {
-        totalResults = data.total_results || data.totalResults || data.items.length;
-        await log('info', `Found ${totalResults} companies incorporated on ${dateToFetch} (estimated from first page)`);
+        totalResults = data.hits || data.total_results || data.totalResults || data.items.length;
+        await log('info', `Found ${totalResults} companies incorporated on ${dateToFetch} (from API hits field)`);
         
         // Store the total results from API
         await supabase
