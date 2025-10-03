@@ -157,6 +157,20 @@ Deno.serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`${searchName} API Error:`, errorText);
+        
+        // Check if it's a throttling error
+        if (response.status === 429) {
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.code === 'throttled') {
+              throw new Error('RATE_LIMIT_EXCEEDED');
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+              throw e;
+            }
+          }
+        }
         return null;
       }
 
@@ -347,16 +361,33 @@ Deno.serve(async (req) => {
         'geo[]': `"${location}"`,
         'company_sic_code[]': companySicNumber
       };
-      const search1Data = await performSearch(search1Params, 'Search 1 (name + location + company_sic_code)');
+      
+      try {
+        const search1Data = await performSearch(search1Params, 'Search 1 (name + location + company_sic_code)');
 
-      if (search1Data) {
-        const result = await processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)', search1Params);
-        if (result) {
-          console.log('✅ Search 1 succeeded! Returning result from Search 1');
-          return result;
+        if (search1Data) {
+          const result = await processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)', search1Params);
+          if (result) {
+            console.log('✅ Search 1 succeeded! Returning result from Search 1');
+            return result;
+          }
         }
+        console.log('Search 1 did not return a result, continuing to Search 2...');
+      } catch (e) {
+        if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+          return new Response(
+            JSON.stringify({
+              found: false,
+              error: 'RocketReach API rate limit reached. Please wait a few minutes and try again.'
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 429,
+            }
+          );
+        }
+        throw e;
       }
-      console.log('Search 1 did not return a result, continuing to Search 2...');
     } else {
       console.log('Skipping Search 1 (no company_sic_code provided)');
     }
@@ -368,16 +399,33 @@ Deno.serve(async (req) => {
       const search2Params = {
         'geo[]': `"${detailed_location}"`
       };
-      const search2Data = await performSearch(search2Params, 'Search 2 (name + detailed_location)');
+      
+      try {
+        const search2Data = await performSearch(search2Params, 'Search 2 (name + detailed_location)');
 
-      if (search2Data) {
-        const result = await processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)', search2Params);
-        if (result) {
-          console.log('✅ Search 2 succeeded! Returning result from Search 2');
-          return result;
+        if (search2Data) {
+          const result = await processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)', search2Params);
+          if (result) {
+            console.log('✅ Search 2 succeeded! Returning result from Search 2');
+            return result;
+          }
         }
+        console.log('Search 2 did not return a result, continuing to Search 3...');
+      } catch (e) {
+        if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+          return new Response(
+            JSON.stringify({
+              found: false,
+              error: 'RocketReach API rate limit reached. Please wait a few minutes and try again.'
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 429,
+            }
+          );
+        }
+        throw e;
       }
-      console.log('Search 2 did not return a result, continuing to Search 3...');
     } else {
       console.log('Skipping Search 2 (no detailed_location provided)');
     }
@@ -388,16 +436,33 @@ Deno.serve(async (req) => {
     const search3Params = {
       'geo[]': `"${location}"`
     };
-    const search3Data = await performSearch(search3Params, 'Search 3 (name + location)');
+    
+    try {
+      const search3Data = await performSearch(search3Params, 'Search 3 (name + location)');
 
-    if (search3Data) {
-      const result = await processResults(search3Data, 'RocketReach (Search 3: name + location)', search3Params);
-      if (result) {
-        console.log('✅ Search 3 succeeded! Returning result from Search 3');
-        return result;
+      if (search3Data) {
+        const result = await processResults(search3Data, 'RocketReach (Search 3: name + location)', search3Params);
+        if (result) {
+          console.log('✅ Search 3 succeeded! Returning result from Search 3');
+          return result;
+        }
       }
+      console.log('Search 3 did not return a result');
+    } catch (e) {
+      if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+        return new Response(
+          JSON.stringify({
+            found: false,
+            error: 'RocketReach API rate limit reached. Please wait a few minutes and try again.'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 429,
+          }
+        );
+      }
+      throw e;
     }
-    console.log('Search 3 did not return a result');
 
     // No results found after all searches
     console.log('No profiles found after all search attempts');
