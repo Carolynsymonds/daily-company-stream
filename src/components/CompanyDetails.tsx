@@ -248,12 +248,18 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       // Build location string from address or country
       let location = "";
       if (officer.address) {
-        const parts = [
-          officer.address.locality,
-          officer.address.country
-        ].filter(Boolean);
-        location = parts.join(", ");
+        const locality = officer.address.locality;
+        const country = officer.address.country;
+        
+        if (locality && country) {
+          // Use "City, Country" format (e.g., "Newcastle, United Kingdom")
+          location = `${locality}, ${country}`;
+        } else if (country) {
+          // Fallback to just country if no city
+          location = country;
+        }
       } else if (officer.country_of_residence) {
+        // Fallback to country of residence if no address
         location = officer.country_of_residence;
       }
 
