@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, ExternalLink, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const RunHistoryTable = () => {
@@ -41,18 +41,6 @@ export const RunHistoryTable = () => {
     );
   };
 
-  const downloadFile = async (filePath: string | null, fileName: string) => {
-    if (!filePath) return;
-
-    const { data } = await supabase.storage.from("scraper-exports").getPublicUrl(filePath);
-
-    const link = document.createElement("a");
-    link.href = data.publicUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   if (isLoading) {
     return <div className="text-center py-8 text-muted-foreground">Loading run history...</div>;
@@ -78,7 +66,7 @@ export const RunHistoryTable = () => {
             <TableHead>Duration</TableHead>
             <TableHead className="text-right">Companies</TableHead>
             <TableHead className="text-right">Pages</TableHead>
-            <TableHead className="text-center">Downloads</TableHead>
+            <TableHead className="text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -114,26 +102,6 @@ export const RunHistoryTable = () => {
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    {run.jsonl_file_path && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadFile(run.jsonl_file_path, `companies-${run.target_date}.jsonl`)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        JSONL
-                      </Button>
-                    )}
-                    {run.csv_file_path && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadFile(run.csv_file_path, `companies-${run.target_date}.csv`)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        CSV
-                      </Button>
-                    )}
                   </div>
                 </TableCell>
               </TableRow>
