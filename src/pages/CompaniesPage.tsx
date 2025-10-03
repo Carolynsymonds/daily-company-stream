@@ -357,11 +357,6 @@ export const CompaniesPage = () => {
                 {filteredCompanies?.length || 0} companies found for {runInfo?.target_date && format(new Date(runInfo.target_date), "PPP")}
                 {(filterByEmail || filterByPhone || filterByLinkedIn) && ' (filtered)'}
               </p>
-              {runInfo && (
-                <p className="text-sm text-muted-foreground">
-                  Scraped on {format(new Date(runInfo.started_at), "PPP 'at' p")}
-                </p>
-              )}
             </div>
             
             <div className="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border">
