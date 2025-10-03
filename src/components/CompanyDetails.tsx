@@ -134,11 +134,24 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
           // Convert contacts to the format expected by the component
           const contactsMap: Record<string, EmailSearchResult> = {};
           contacts.forEach(contact => {
+            // Handle phone data - might be string or object from old data
+            let phoneData: Array<string | { number: string; is_premium?: boolean }> | undefined;
+            if (contact.phone) {
+              try {
+                // Try to parse as JSON in case it's stored as object
+                const parsed = typeof contact.phone === 'string' ? JSON.parse(contact.phone) : contact.phone;
+                phoneData = [parsed];
+              } catch {
+                // If parsing fails, it's a plain string
+                phoneData = [contact.phone as string];
+              }
+            }
+            
             contactsMap[contact.officer_id] = {
               found: contact.found,
               email: contact.email || undefined,
               emails: contact.email ? [contact.email] : undefined,
-              phones: contact.phone ? [contact.phone] : undefined,
+              phones: phoneData,
               linkedin: contact.linkedin_url || undefined,
               source: contact.source || undefined,
               error: contact.error_message || undefined,
