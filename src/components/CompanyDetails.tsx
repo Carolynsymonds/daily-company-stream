@@ -420,77 +420,75 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
                                       
                                       {/* Contact Search Results */}
                                       {emailResult && (
-                                        <div className="mt-2 p-3 bg-white rounded border space-y-2">
-                                          {emailResult.found ? (
-                                            <div className="space-y-2">
-                                              {/* Emails */}
-                                              {emailResult.emails && emailResult.emails.length > 0 && (
-                                                <div className="space-y-1">
-                                                  <div className="flex items-center gap-2 text-green-700">
-                                                    <Mail className="h-4 w-4" />
-                                                    <span className="font-medium text-xs">Email{emailResult.emails.length > 1 ? 's' : ''}:</span>
-                                                  </div>
+                                        <div className="mt-2 p-3 bg-white rounded border space-y-1.5">
+                                          {/* Email */}
+                                          <div className="flex items-start gap-2">
+                                            <Mail className="h-4 w-4 mt-0.5 text-gray-600" />
+                                            <div className="flex-1">
+                                              <span className="font-medium text-xs text-gray-700">Email: </span>
+                                              {emailResult.emails && emailResult.emails.length > 0 ? (
+                                                <div className="space-y-0.5">
                                                   {emailResult.emails.map((email, idx) => (
-                                                    <div key={idx} className="pl-6 text-sm">
-                                                      <a href={`mailto:${email}`} className="text-blue-600 hover:underline">
-                                                        {email}
-                                                      </a>
-                                                    </div>
+                                                    <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
+                                                      {email}
+                                                    </a>
                                                   ))}
                                                 </div>
-                                              )}
-                                              {/* Single email (fallback) */}
-                                              {emailResult.email && (!emailResult.emails || emailResult.emails.length === 0) && (
-                                                <div className="flex items-center gap-2 text-green-700">
-                                                  <Mail className="h-4 w-4" />
-                                                  <span className="font-medium">{emailResult.email}</span>
-                                                </div>
-                                              )}
-                                              {/* Phones */}
-                                              {emailResult.phones && emailResult.phones.length > 0 && (
-                                                <div className="space-y-1">
-                                                  <div className="flex items-center gap-2 text-green-700">
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                                    </svg>
-                                                    <span className="font-medium text-xs">Phone{emailResult.phones.length > 1 ? 's' : ''}:</span>
-                                                  </div>
-                                                  {emailResult.phones.map((phone, idx) => (
-                                                    <div key={idx} className="pl-6 text-sm">
-                                                      <a href={`tel:${phone}`} className="text-blue-600 hover:underline">
-                                                        {phone}
-                                                      </a>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                              {/* LinkedIn */}
-                                              {emailResult.linkedin && (
-                                                <div className="flex items-center gap-2 text-blue-700">
-                                                  <ExternalLink className="h-4 w-4" />
-                                                  <a 
-                                                    href={emailResult.linkedin} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="text-sm text-blue-600 hover:underline"
-                                                  >
-                                                    LinkedIn Profile
-                                                  </a>
-                                                </div>
-                                              )}
-                                              {/* Error message if applicable */}
-                                              {emailResult.error && (
-                                                <div className="text-xs text-amber-600 italic">
-                                                  {emailResult.error}
-                                                </div>
+                                              ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
+                                                <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
+                                                  {emailResult.email}
+                                                </a>
+                                              ) : (
+                                                <span className="text-sm text-gray-500 italic">Not available</span>
                                               )}
                                             </div>
-                                          ) : (
-                                            <div className="flex items-center gap-2 text-red-600">
-                                              <Mail className="h-4 w-4" />
-                                              <span className="text-sm">
-                                                {emailResult.error || 'No contact information found'}
-                                              </span>
+                                          </div>
+                                          
+                                          {/* Phone */}
+                                          <div className="flex items-start gap-2">
+                                            <svg className="h-4 w-4 mt-0.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                            </svg>
+                                            <div className="flex-1">
+                                              <span className="font-medium text-xs text-gray-700">Phone: </span>
+                                              {emailResult.phones && emailResult.phones.length > 0 ? (
+                                                <div className="space-y-0.5">
+                                                  {emailResult.phones.map((phone, idx) => (
+                                                    <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
+                                                      {phone}
+                                                    </a>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <span className="text-sm text-gray-500 italic">Not available</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          
+                                          {/* LinkedIn */}
+                                          <div className="flex items-start gap-2">
+                                            <ExternalLink className="h-4 w-4 mt-0.5 text-gray-600" />
+                                            <div className="flex-1">
+                                              <span className="font-medium text-xs text-gray-700">LinkedIn: </span>
+                                              {emailResult.linkedin ? (
+                                                <a 
+                                                  href={emailResult.linkedin} 
+                                                  target="_blank" 
+                                                  rel="noopener noreferrer"
+                                                  className="text-sm text-blue-600 hover:underline"
+                                                >
+                                                  View Profile
+                                                </a>
+                                              ) : (
+                                                <span className="text-sm text-gray-500 italic">Not available</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Error/Info message */}
+                                          {emailResult.error && (
+                                            <div className="text-xs text-amber-600 italic pt-1 border-t">
+                                              {emailResult.error}
                                             </div>
                                           )}
                                         </div>
