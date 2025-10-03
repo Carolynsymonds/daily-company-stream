@@ -17,51 +17,9 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Controls */}
-          <div className="lg:col-span-1">
-            <ScraperControls />
-          </div>
-
-          {/* Stats Cards */}
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription className="flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Total Runs
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">-</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Active Status
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">Idle</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardDescription className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Rate Limit
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">600/5m</div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Controls */}
+        <div className="max-w-2xl mx-auto">
+          <ScraperControls />
         </div>
 
         {/* Tabs */}
