@@ -234,16 +234,23 @@ Deno.serve(async (req) => {
         // Get full profile details including emails
         let fullProfileData: any = null;
         let detailedEmails: string[] = [];
+        let recommendedEmail: string | undefined = undefined;
         
         if (profile.id) {
           fullProfileData = await getProfileDetails(profile.id);
-          if (fullProfileData && fullProfileData.emails && Array.isArray(fullProfileData.emails)) {
-            // Extract actual email addresses from the detailed response objects
-            detailedEmails = fullProfileData.emails.map((e: any) => 
-              typeof e === 'string' ? e : e.email
-            ).filter(Boolean);
-            console.log('📧 Full email details retrieved:', fullProfileData.emails);
-            console.log('📧 Extracted email addresses:', detailedEmails);
+          if (fullProfileData) {
+            // Extract recommended email
+            recommendedEmail = fullProfileData.recommended_email;
+            console.log('📧 Recommended email:', recommendedEmail);
+            
+            // Extract all emails from the detailed response
+            if (fullProfileData.emails && Array.isArray(fullProfileData.emails)) {
+              detailedEmails = fullProfileData.emails.map((e: any) => 
+                typeof e === 'string' ? e : e.email
+              ).filter(Boolean);
+              console.log('📧 All email details:', fullProfileData.emails);
+              console.log('📧 Extracted email addresses:', detailedEmails);
+            }
           }
         }
         
@@ -252,27 +259,27 @@ Deno.serve(async (req) => {
         const preview = profile.teaser?.preview || [];
         
         console.log('Contact info extracted:', {
+          recommendedEmail: recommendedEmail,
           detailedEmails: detailedEmails.length,
           phones: phones.length,
           hasLinkedIn: !!profile.linkedin_url,
           preview: preview.length
         });
         
-        // Use detailed emails from lookup if available
-        const finalEmails = detailedEmails.length > 0 ? detailedEmails : [];
-        const primaryEmail = finalEmails.length > 0 ? finalEmails[0] :
-          (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined);
+        // Use recommended email if available, otherwise first detailed email
+        const primaryEmail = recommendedEmail || (detailedEmails.length > 0 ? detailedEmails[0] : 
+          (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined));
         
-        console.log('📊 Final email data:', { finalEmails, primaryEmail });
+        console.log('📊 Final email data:', { primaryEmail, detailedEmails });
         
          const responseData = {
            found: true,
            email: primaryEmail,
-           emails: finalEmails.length > 0 ? finalEmails : undefined,
+           emails: detailedEmails.length > 0 ? detailedEmails : undefined,
            phones: phones.length > 0 ? phones : undefined,
            linkedin: profile.linkedin_url,
            source: source,
-           error: finalEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+           error: detailedEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
            profile: {
              name: profile.name,
              title: profile.current_title,
