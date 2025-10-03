@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, MapPin, Calendar, Hash, ExternalLink, Users, User, Mail, Search, Loader2, Filter } from "lucide-react";
+import { Building2, MapPin, Calendar, Hash, ExternalLink, Users, User, Mail, Search, Loader2, Filter, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -460,215 +461,209 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[600px] w-full">
-          <div className="space-y-4">
+          <Accordion type="multiple" className="space-y-2">
             {filteredCompanies?.map((company) => {
               const companyOfficers = getOfficersForCompany(company.id);
               const isExpanded = expandedCompanies.has(company.id);
               
               return (
-                <div key={company.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="space-y-2">
-                    {/* Company Name and Officers Toggle */}
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-semibold mb-1">
-                        <a 
-                          className="text-blue-600 hover:text-blue-800 hover:underline" 
-                          href={`https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {company.company_name}
-                          <span className="sr-only">(link opens a new window)</span>
-                        </a>
+                <AccordionItem key={company.id} value={company.id} className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <h2 className="text-lg font-semibold text-left">
+                        {company.company_name}
                       </h2>
-                      
-                      <Collapsible open={isExpanded} onOpenChange={() => toggleCompanyExpansion(company.id)}>
-                        <CollapsibleTrigger asChild>
-                          <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline">
-                            <Users className="h-4 w-4" />
-                            {companyOfficers.length} officer{companyOfficers.length !== 1 ? 's' : ''}
-                            <span className="text-xs">
-                              {isExpanded ? '▼' : '▶'}
-                            </span>
-                          </button>
-                        </CollapsibleTrigger>
-                      </Collapsible>
+                      <Badge variant="outline" className="text-xs">
+                        {companyOfficers.length} officer{companyOfficers.length !== 1 ? 's' : ''}
+                      </Badge>
                     </div>
-                    
-                    {/* Status */}
-                    <p className="mb-2">
-                      <span className="font-semibold capitalize">
-                        {company.company_status}
-                      </span>
-                    </p>
-                    
-                    {/* Company Details List */}
-                    <ul className="text-sm space-y-1 list-none pl-0">
-                      <li>{formatCompanyType(company.company_type)}</li>
-                      <li>
-                        {company.company_number} - Incorporated on {formatIncorporationDate(company.date_of_creation)}
-                      </li>
-                      <li>{formatAddress(company.registered_office_address)}</li>
-                      {company.sic_codes && company.sic_codes.length > 0 && (
-                        <li>SIC codes - {company.sic_codes.join(", ")}</li>
-                      )}
-                    </ul>
+                  </AccordionTrigger>
+                  
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      {/* Company Details */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <a 
+                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline" 
+                            href={`https://find-and-update.company-information.service.gov.uk/company/${company.company_number}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on Companies House
+                            <ExternalLink className="h-3 w-3 inline ml-1" />
+                          </a>
+                        </div>
+                        
+                        <p className="text-sm">
+                          <span className="font-semibold">Status: </span>
+                          <span className="capitalize">{company.company_status}</span>
+                        </p>
+                        
+                        <ul className="text-sm space-y-1 list-none pl-0 text-muted-foreground">
+                          <li>{formatCompanyType(company.company_type)}</li>
+                          <li>
+                            {company.company_number} - Incorporated on {formatIncorporationDate(company.date_of_creation)}
+                          </li>
+                          <li>{formatAddress(company.registered_office_address)}</li>
+                          {company.sic_codes && company.sic_codes.length > 0 && (
+                            <li>SIC codes - {company.sic_codes.join(", ")}</li>
+                          )}
+                        </ul>
+                      </div>
 
-                    {/* Officers Section */}
-                    <Collapsible open={isExpanded} onOpenChange={() => toggleCompanyExpansion(company.id)}>
-                      <CollapsibleContent className="mt-4">
-                        {companyOfficers.length > 0 ? (
-                          <div className="border-t pt-4">
-                            <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              Officers & Directors
-                            </h3>
-                            <div className="space-y-3">
-                              {companyOfficers.map((officer) => {
-                                const isSearching = searchingEmails.has(officer.id);
-                                const emailResult = emailSearchResults[officer.id];
-                                
-                                return (
-                                  <div key={officer.id} className="bg-gray-50 rounded-lg p-3">
-                                    <div className="flex items-start justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <User className="h-4 w-4 text-gray-600" />
-                                        <h4 className="font-medium">{officer.name}</h4>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {officer.officer_role}
-                                        </Badge>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => searchEmail(officer)}
-                                          disabled={isSearching}
-                                          className="h-6 px-2 text-xs"
-                                        >
-                                          {isSearching ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <Search className="h-3 w-3" />
-                                          )}
-                                          <span className="ml-1">Find Email</span>
-                                        </Button>
-                                      </div>
+                      {/* Officers Section */}
+                      {companyOfficers.length > 0 ? (
+                        <div className="border-t pt-4">
+                          <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Officers & Directors
+                          </h3>
+                          <div className="space-y-3">
+                            {companyOfficers.map((officer) => {
+                              const isSearching = searchingEmails.has(officer.id);
+                              const emailResult = emailSearchResults[officer.id];
+                              
+                              return (
+                                <div key={officer.id} className="bg-muted/50 rounded-lg p-3">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4 text-muted-foreground" />
+                                      <h4 className="font-medium">{officer.name}</h4>
                                     </div>
-                                    
-                                    <div className="text-sm space-y-1 text-gray-600">
-                                      <p><strong>Appointed:</strong> {formatAppointmentDate(officer.appointed_on)}</p>
-                                      {officer.occupation && (
-                                        <p><strong>Occupation:</strong> {officer.occupation}</p>
-                                      )}
-                                      {officer.nationality && (
-                                        <p><strong>Nationality:</strong> {officer.nationality}</p>
-                                      )}
-                                      {officer.country_of_residence && (
-                                        <p><strong>Country of Residence:</strong> {officer.country_of_residence}</p>
-                                      )}
-                                      {officer.date_of_birth && (
-                                        <p><strong>Date of Birth:</strong> {formatDateOfBirth(officer.date_of_birth)}</p>
-                                      )}
-                                      {officer.address && (
-                                        <p><strong>Address:</strong> {formatOfficerAddress(officer.address)}</p>
-                                      )}
-                                      
-                                      {/* Contact Search Results */}
-                                      {emailResult && (
-                                        <div className="mt-2 p-3 bg-white rounded border space-y-1.5">
-                                          {/* Email */}
-                                          <div className="flex items-start gap-2">
-                                            <Mail className="h-4 w-4 mt-0.5 text-gray-600" />
-                                            <div className="flex-1">
-                                              <span className="font-medium text-xs text-gray-700">Email: </span>
-                                              {emailResult.emails && emailResult.emails.length > 0 ? (
-                                                <div className="space-y-0.5">
-                                                  {emailResult.emails.map((email, idx) => (
-                                                    <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
-                                                      {email}
-                                                    </a>
-                                                  ))}
-                                                </div>
-                                              ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
-                                                <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
-                                                  {emailResult.email}
-                                                </a>
-                                              ) : (
-                                                <span className="text-sm text-gray-500 italic">Not available</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          
-                                          {/* Phone */}
-                                          <div className="flex items-start gap-2">
-                                            <svg className="h-4 w-4 mt-0.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                            </svg>
-                                            <div className="flex-1">
-                                              <span className="font-medium text-xs text-gray-700">Phone: </span>
-                                              {emailResult.phones && emailResult.phones.length > 0 ? (
-                                                <div className="space-y-0.5">
-                                                  {emailResult.phones.map((phone, idx) => (
-                                                    <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
-                                                      {phone}
-                                                    </a>
-                                                  ))}
-                                                </div>
-                                              ) : (
-                                                <span className="text-sm text-gray-500 italic">Not available</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          
-                                          {/* LinkedIn */}
-                                          <div className="flex items-start gap-2">
-                                            <ExternalLink className="h-4 w-4 mt-0.5 text-gray-600" />
-                                            <div className="flex-1">
-                                              <span className="font-medium text-xs text-gray-700">LinkedIn: </span>
-                                              {emailResult.linkedin ? (
-                                                <a 
-                                                  href={emailResult.linkedin} 
-                                                  target="_blank" 
-                                                  rel="noopener noreferrer"
-                                                  className="text-sm text-blue-600 hover:underline"
-                                                >
-                                                  View Profile
-                                                </a>
-                                              ) : (
-                                                <span className="text-sm text-gray-500 italic">Not available</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          
-                                          {/* Error/Info message */}
-                                          {emailResult.error && (
-                                            <div className="text-xs text-amber-600 italic pt-1 border-t">
-                                              {emailResult.error}
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        {officer.officer_role}
+                                      </Badge>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => searchEmail(officer)}
+                                        disabled={isSearching}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        {isSearching ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Search className="h-3 w-3" />
+                                        )}
+                                        <span className="ml-1">Find Email</span>
+                                      </Button>
                                     </div>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  
+                                  <div className="text-sm space-y-1 text-muted-foreground">
+                                    <p><strong>Appointed:</strong> {formatAppointmentDate(officer.appointed_on)}</p>
+                                    {officer.occupation && (
+                                      <p><strong>Occupation:</strong> {officer.occupation}</p>
+                                    )}
+                                    {officer.nationality && (
+                                      <p><strong>Nationality:</strong> {officer.nationality}</p>
+                                    )}
+                                    {officer.country_of_residence && (
+                                      <p><strong>Country of Residence:</strong> {officer.country_of_residence}</p>
+                                    )}
+                                    {officer.date_of_birth && (
+                                      <p><strong>Date of Birth:</strong> {formatDateOfBirth(officer.date_of_birth)}</p>
+                                    )}
+                                    {officer.address && (
+                                      <p><strong>Address:</strong> {formatOfficerAddress(officer.address)}</p>
+                                    )}
+                                    
+                                    {/* Contact Search Results */}
+                                    {emailResult && (
+                                      <div className="mt-2 p-3 bg-background rounded border space-y-1.5">
+                                        {/* Email */}
+                                        <div className="flex items-start gap-2">
+                                          <Mail className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                                          <div className="flex-1">
+                                            <span className="font-medium text-xs">Email: </span>
+                                            {emailResult.emails && emailResult.emails.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {emailResult.emails.map((email, idx) => (
+                                                  <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
+                                                    {email}
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
+                                              <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
+                                                {emailResult.email}
+                                              </a>
+                                            ) : (
+                                              <span className="text-sm text-muted-foreground italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Phone */}
+                                        <div className="flex items-start gap-2">
+                                          <svg className="h-4 w-4 mt-0.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                          </svg>
+                                          <div className="flex-1">
+                                            <span className="font-medium text-xs">Phone: </span>
+                                            {emailResult.phones && emailResult.phones.length > 0 ? (
+                                              <div className="space-y-0.5">
+                                                {emailResult.phones.map((phone, idx) => (
+                                                  <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
+                                                    {phone}
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <span className="text-sm text-muted-foreground italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* LinkedIn */}
+                                        <div className="flex items-start gap-2">
+                                          <ExternalLink className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                                          <div className="flex-1">
+                                            <span className="font-medium text-xs">LinkedIn: </span>
+                                            {emailResult.linkedin ? (
+                                              <a 
+                                                href={emailResult.linkedin} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 hover:underline"
+                                              >
+                                                View Profile
+                                              </a>
+                                            ) : (
+                                              <span className="text-sm text-muted-foreground italic">Not available</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Error/Info message */}
+                                        {emailResult.error && (
+                                          <div className="text-xs text-amber-600 italic pt-1 border-t">
+                                            {emailResult.error}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        ) : (
-                          <div className="border-t pt-4">
-                            <p className="text-sm text-gray-500 italic">
-                              No officers found for this company.
-                            </p>
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
-                </div>
+                        </div>
+                      ) : (
+                        <div className="border-t pt-4">
+                          <p className="text-sm text-muted-foreground italic">
+                            No officers found for this company.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               );
             })}
-          </div>
+          </Accordion>
         </ScrollArea>
       </CardContent>
     </Card>
