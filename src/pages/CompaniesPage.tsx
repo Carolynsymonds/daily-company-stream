@@ -112,6 +112,42 @@ export const CompaniesPage = () => {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
+      
+      // Fetch all contact details for officers
+      const allOfficerIds = data?.flatMap(c => c.officers?.map((o: any) => o.id) || []) || [];
+      
+      if (allOfficerIds.length > 0) {
+        const { data: contacts, error: contactsError } = await supabase
+          .from('officer_contacts')
+          .select('*')
+          .in('officer_id', allOfficerIds);
+        
+        if (!contactsError && contacts) {
+          // Convert contacts to the format expected by the component
+          const contactsMap: Record<string, EmailSearchResult> = {};
+          contacts.forEach(contact => {
+            contactsMap[contact.officer_id] = {
+              found: contact.found,
+              email: contact.email || undefined,
+              emails: contact.email ? [contact.email] : undefined,
+              phones: contact.phone ? [contact.phone] : undefined,
+              linkedin: contact.linkedin_url || undefined,
+              source: contact.source || undefined,
+              error: contact.error_message || undefined,
+              profile: {
+                name: contact.profile_name || undefined,
+                title: contact.profile_title || undefined,
+                employer: contact.profile_employer || undefined,
+                location: contact.profile_location || undefined
+              }
+            };
+          });
+          
+          // Update the state with pre-loaded contacts
+          setEmailSearchResults(contactsMap);
+        }
+      }
+      
       return data as (Company & { officers: Officer[] })[];
     },
     enabled: !!runId,
