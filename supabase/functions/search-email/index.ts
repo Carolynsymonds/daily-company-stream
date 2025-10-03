@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
       
       try {
         const response = await fetch(lookupUrl, {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'API-Key': apiKey,
