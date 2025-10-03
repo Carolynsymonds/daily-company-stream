@@ -239,16 +239,19 @@ Deno.serve(async (req) => {
         if (profile.id) {
           fullProfileData = await getProfileDetails(profile.id);
           if (fullProfileData) {
+            // Handle case where API returns an array with the profile object
+            const profileData = Array.isArray(fullProfileData) ? fullProfileData[0] : fullProfileData;
+            
             // Extract recommended email
-            recommendedEmail = fullProfileData.recommended_email;
+            recommendedEmail = profileData.recommended_email;
             console.log('📧 Recommended email:', recommendedEmail);
             
             // Extract all emails from the detailed response
-            if (fullProfileData.emails && Array.isArray(fullProfileData.emails)) {
-              detailedEmails = fullProfileData.emails.map((e: any) => 
+            if (profileData.emails && Array.isArray(profileData.emails)) {
+              detailedEmails = profileData.emails.map((e: any) => 
                 typeof e === 'string' ? e : e.email
               ).filter(Boolean);
-              console.log('📧 All email details:', fullProfileData.emails);
+              console.log('📧 All email details:', profileData.emails);
               console.log('📧 Extracted email addresses:', detailedEmails);
             }
           }
