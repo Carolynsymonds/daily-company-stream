@@ -74,7 +74,12 @@ Deno.serve(async (req) => {
     const { name, location, company_sic_code, detailed_location }: EmailSearchRequest = await req.json();
     
     console.log('=== Email Search Function Invoked ===');
-    console.log('Request body:', { name, location, company_sic_code, detailed_location });
+    console.log('📥 INPUT DATA:');
+    console.log('   name:', name);
+    console.log('   location:', location);
+    console.log('   company_sic_code:', company_sic_code);
+    console.log('   detailed_location:', detailed_location);
+    console.log('====================================');
 
     if (!name) {
       return new Response(
@@ -118,8 +123,17 @@ Deno.serve(async (req) => {
       });
 
       console.log(`=== ${searchName} ===`);
-      console.log('Search URL:', searchUrl.toString());
-      console.log('Search Parameters:', Object.fromEntries(searchUrl.searchParams));
+      console.log('🔍 EXACT API REQUEST:');
+      console.log('📋 Full URL:', searchUrl.toString());
+      console.log('📋 Base URL:', searchUrl.origin + searchUrl.pathname);
+      console.log('📋 Query Parameters:');
+      Object.entries(searchUrl.searchParams).forEach(([key, value]) => {
+        console.log(`   ${key} = ${value}`);
+      });
+      console.log('📋 Request Headers:', {
+        'Api-Key': `${apiKey.substring(0, 10)}...`,
+        'Accept': 'application/json'
+      });
       console.log('==============================');
 
       const response = await fetch(searchUrl.toString(), {
@@ -189,23 +203,25 @@ Deno.serve(async (req) => {
         console.log('Email details:', { allEmails, preview });
         console.log('Phone details:', phones);
         
-        const responseData = {
-          found: true,
-          email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-          emails: allEmails.length > 0 ? allEmails : undefined,
-          phones: phones.length > 0 ? phones : undefined,
-          linkedin: profile.linkedin_url,
-          source: source,
-          error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
-          profile: {
-            name: profile.name,
-            title: profile.current_title,
-            employer: profile.current_employer,
-            location: profile.location
-          }
-        };
-        
-        console.log('Returning successful response:', responseData);
+         const responseData = {
+           found: true,
+           email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+           emails: allEmails.length > 0 ? allEmails : undefined,
+           phones: phones.length > 0 ? phones : undefined,
+           linkedin: profile.linkedin_url,
+           source: source,
+           error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+           profile: {
+             name: profile.name,
+             title: profile.current_title,
+             employer: profile.current_employer,
+             location: profile.location
+           }
+         };
+         
+         console.log('🎉 SUCCESS! Found contact details');
+         console.log('🏆 WINNING SEARCH METHOD:', source);
+         console.log('📊 FINAL RESULT DATA:', responseData);
         
         return new Response(
           JSON.stringify(responseData),
@@ -219,14 +235,30 @@ Deno.serve(async (req) => {
       return null;
     };
 
-    console.log('=== Three-Tier Search Strategy ===');
-    console.log('Search 1: name + location + company_sic_code');
-    console.log('Search 2: name + detailed_location (if available)');
-    console.log('Search 3: name + location');
-    console.log('==================================');
+    // VALIDATE: Must have location to proceed
+    if (!location) {
+      console.log('ERROR: No location provided - search cannot proceed');
+      return new Response(
+        JSON.stringify({
+          found: false,
+          error: 'Location is required for search'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    console.log('=== Three-Tier Search Strategy (ALWAYS WITH LOCATION) ===');
+    console.log('🎯 SEARCH PLAN:');
+    console.log('   Search 1: name + location + company_sic_code');
+    console.log('   Search 2: name + detailed_location (if available)');
+    console.log('   Search 3: name + location (ALWAYS EXECUTED)');
+    console.log('=========================================================');
 
     // SEARCH 1: name + location + company_sic_code
-    if (location && company_sic_code) {
+    if (company_sic_code) {
       console.log('Starting Search 1...');
       const companySicNumber = company_sic_code.split(' - ')[0];
       console.log('Extracted SIC number:', companySicNumber);
@@ -239,13 +271,13 @@ Deno.serve(async (req) => {
       if (search1Data) {
         const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)');
         if (result) {
-          console.log('Search 1 succeeded, returning result');
+          console.log('✅ Search 1 succeeded! Returning result from Search 1');
           return result;
         }
       }
       console.log('Search 1 did not return a result, continuing to Search 2...');
     } else {
-      console.log('Skipping Search 1 (missing location or company_sic_code)');
+      console.log('Skipping Search 1 (no company_sic_code provided)');
     }
 
     // SEARCH 2: name + detailed_location (if available)
@@ -259,7 +291,7 @@ Deno.serve(async (req) => {
       if (search2Data) {
         const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)');
         if (result) {
-          console.log('Search 2 succeeded, returning result');
+          console.log('✅ Search 2 succeeded! Returning result from Search 2');
           return result;
         }
       }
@@ -268,25 +300,21 @@ Deno.serve(async (req) => {
       console.log('Skipping Search 2 (no detailed_location provided)');
     }
 
-    // SEARCH 3: name + location (only if location is available)
-    if (location) {
-      console.log('Starting Search 3 with location:', location);
-      
-      const search3Data = await performSearch({
-        'geo[]': `"${location}"`
-      }, 'Search 3 (name + location)');
+    // SEARCH 3: name + location (ALWAYS EXECUTED)
+    console.log('Starting Search 3 with location:', location);
+    
+    const search3Data = await performSearch({
+      'geo[]': `"${location}"`
+    }, 'Search 3 (name + location)');
 
-      if (search3Data) {
-        const result = processResults(search3Data, 'RocketReach (Search 3: name + location)');
-        if (result) {
-          console.log('Search 3 succeeded, returning result');
-          return result;
-        }
+    if (search3Data) {
+      const result = processResults(search3Data, 'RocketReach (Search 3: name + location)');
+      if (result) {
+        console.log('✅ Search 3 succeeded! Returning result from Search 3');
+        return result;
       }
-      console.log('Search 3 did not return a result');
-    } else {
-      console.log('Skipping Search 3 (no location provided)');
     }
+    console.log('Search 3 did not return a result');
 
     // No results found after all searches
     console.log('No profiles found after all search attempts');
