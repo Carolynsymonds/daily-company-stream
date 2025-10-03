@@ -198,49 +198,28 @@ Deno.serve(async (req) => {
       // Combine all available emails
       const allEmails = [...emails, ...professionalEmails, ...personalEmails];
       
-      const hasContactInfo = allEmails.length > 0 || phones.length > 0 || profile.linkedin_url;
-      
-      if (hasContactInfo) {
-        return new Response(
-          JSON.stringify({
-            found: true,
-            email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-            emails: allEmails.length > 0 ? allEmails : undefined,
-            phones: phones.length > 0 ? phones : undefined,
-            linkedin: profile.linkedin_url,
-            source: 'RocketReach',
-            error: allEmails.length === 0 && preview.length > 0 ? 'Email found but requires RocketReach credits to reveal' : undefined,
-            profile: {
-              name: profile.name,
-              title: profile.current_title,
-              employer: profile.current_employer,
-              location: profile.location
-            }
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
+      // Always return if we found a profile (even if some data requires credits)
+      return new Response(
+        JSON.stringify({
+          found: true,
+          email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+          emails: allEmails.length > 0 ? allEmails : undefined,
+          phones: phones.length > 0 ? phones : undefined,
+          linkedin: profile.linkedin_url,
+          source: 'RocketReach',
+          error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+          profile: {
+            name: profile.name,
+            title: profile.current_title,
+            employer: profile.current_employer,
+            location: profile.location
           }
-        );
-      } else {
-        // Profile found but no contact info available
-        return new Response(
-          JSON.stringify({
-            found: false,
-            error: 'Profile found but no contact information available',
-            profile: {
-              name: profile.name,
-              title: profile.current_title,
-              employer: profile.current_employer,
-              location: profile.location
-            }
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        );
-      }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     } else {
       return new Response(
         JSON.stringify({
