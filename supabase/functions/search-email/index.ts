@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       });
 
       console.log(`=== ${searchName} ===`);
-      console.log('🔍 EXACT API REQUEST:');
+      console.log('🔍 EXACT API REQUEST1');
       console.log('📋 Full URL:', searchUrl.toString());
       console.log('📋 Base URL:', searchUrl.origin + searchUrl.pathname);
       console.log('📋 Query Parameters:');
