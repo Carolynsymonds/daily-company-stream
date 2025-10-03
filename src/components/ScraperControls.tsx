@@ -17,6 +17,7 @@ export const ScraperControls = () => {
   };
 
   const [targetDate, setTargetDate] = useState(getYesterday());
+  const [companyLimit, setCompanyLimit] = useState(5);
 
   const handleRunScraper = async () => {
     setIsRunning(true);
@@ -24,7 +25,10 @@ export const ScraperControls = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke("scrape-companies", {
-        body: { targetDate: targetDate || undefined },
+        body: { 
+          targetDate: targetDate || undefined,
+          maxCompanies: companyLimit,
+        },
       });
 
       if (error) throw error;
@@ -58,6 +62,21 @@ export const ScraperControls = () => {
           />
           <p className="text-xs text-muted-foreground">
             Defaults to yesterday in Europe/London timezone
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="company-limit">Company Limit</Label>
+          <Input
+            id="company-limit"
+            type="number"
+            min="1"
+            max="1000"
+            value={companyLimit}
+            onChange={(e) => setCompanyLimit(parseInt(e.target.value) || 5)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Maximum number of companies to scrape (1-1000)
           </p>
         </div>
 

@@ -75,7 +75,7 @@ interface RateLimitState {
 const RATE_LIMIT = 600; // 600 requests per 5 minutes
 const WINDOW_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
 const PAGE_SIZE = 100; // Max allowed by API
-const MAX_COMPANIES = 5; // Limit to 5 companies for demo purposes
+const DEFAULT_MAX_COMPANIES = 5; // Default limit
 
 // Helper function to fetch and store officers for a company
 async function fetchAndStoreOfficers(
@@ -240,8 +240,9 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get target date from request or use yesterday (Europe/London)
-    const { targetDate } = await req.json().catch(() => ({}));
+    // Get target date and maxCompanies from request or use defaults
+    const { targetDate, maxCompanies } = await req.json().catch(() => ({}));
+    const MAX_COMPANIES = maxCompanies || DEFAULT_MAX_COMPANIES;
     
     // Calculate yesterday in Europe/London timezone
     const londonTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/London' }));
