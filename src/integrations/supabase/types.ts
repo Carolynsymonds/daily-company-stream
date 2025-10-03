@@ -61,6 +61,42 @@ export type Database = {
           },
         ]
       }
+      company_sic_codes: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          sic_code_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          sic_code_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          sic_code_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_sic_codes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_sic_codes_sic_code_id_fkey"
+            columns: ["sic_code_id"]
+            isOneToOne: false
+            referencedRelation: "sic_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       officer_contacts: {
         Row: {
           created_at: string
@@ -217,27 +253,6 @@ export type Database = {
           },
         ]
       }
-      sic_codes: {
-        Row: {
-          id: string
-          code: string
-          description: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          code: string
-          description: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          code?: string
-          description?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
       scraper_runs: {
         Row: {
           completed_at: string | null
@@ -280,6 +295,27 @@ export type Database = {
           target_date?: string
           total_companies?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      sic_codes: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
         }
         Relationships: []
       }
