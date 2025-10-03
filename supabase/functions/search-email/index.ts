@@ -13,16 +13,26 @@ interface EmailSearchRequest {
 }
 
 interface RocketReachResponse {
-  results?: Array<{
-    email?: string;
-    confidence?: number;
-    source?: string;
+  profiles?: Array<{
+    id?: number;
+    name?: string;
+    linkedin_url?: string;
+    location?: string;
+    current_title?: string;
+    current_employer?: string;
+    teaser?: {
+      emails?: string[];
+      phones?: string[];
+      preview?: string[];
+      personal_emails?: string[];
+      professional_emails?: string[];
+    };
     [key: string]: any;
   }>;
   pagination?: {
-    page: number;
-    per_page: number;
     total: number;
+    thisPage: number;
+    nextPage?: number;
   };
   error?: string;
 }
@@ -171,28 +181,63 @@ Deno.serve(async (req) => {
     
     console.log('RocketReach API Response Data:', data);
 
-    // Check if we have results
-    if (data.results && data.results.length > 0) {
-      // Find the best match (highest confidence or first result with email)
-      const bestMatch = data.results.find(result => result.email) || data.results[0];
+    // Check if we have profiles
+    if (data.profiles && data.profiles.length > 0) {
+      const profile = data.profiles[0];
       
-      return new Response(
-        JSON.stringify({
-          found: true,
-          email: bestMatch.email,
-          confidence: bestMatch.confidence,
-          source: bestMatch.source || 'RocketReach'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+      // Check if we have actual email addresses
+      const emails = profile.teaser?.emails || [];
+      const professionalEmails = profile.teaser?.professional_emails || [];
+      const personalEmails = profile.teaser?.personal_emails || [];
+      
+      // Combine all available emails
+      const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+      
+      if (allEmails.length > 0) {
+        return new Response(
+          JSON.stringify({
+            found: true,
+            email: allEmails[0],
+            source: 'RocketReach',
+            profile: {
+              name: profile.name,
+              title: profile.current_title,
+              employer: profile.current_employer,
+              linkedin: profile.linkedin_url
+            }
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } else {
+        // Profile found but no email available (may require credits)
+        const preview = profile.teaser?.preview || [];
+        return new Response(
+          JSON.stringify({
+            found: true,
+            email: preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined,
+            source: 'RocketReach',
+            error: 'Email found but requires RocketReach credits to reveal',
+            profile: {
+              name: profile.name,
+              title: profile.current_title,
+              employer: profile.current_employer,
+              linkedin: profile.linkedin_url
+            }
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
     } else {
       return new Response(
         JSON.stringify({
           found: false,
-          error: data.error || 'No results found'
+          error: data.error || 'No profiles found'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
