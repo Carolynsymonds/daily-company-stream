@@ -58,10 +58,19 @@ interface Officer {
 
 interface EmailSearchResult {
   email?: string;
+  emails?: string[];
+  phones?: string[];
+  linkedin?: string;
   confidence?: number;
   source?: string;
   found: boolean;
   error?: string;
+  profile?: {
+    name?: string;
+    title?: string;
+    employer?: string;
+    location?: string;
+  };
 }
 
 export const CompaniesPage = () => {
@@ -434,26 +443,75 @@ export const CompaniesPage = () => {
 
                             {/* Email Search Results */}
                             {emailResult && (
-                              <div className="mt-3 p-3 bg-white rounded border border-gray-200">
-                                {emailResult.found && emailResult.email ? (
-                                  <div className="flex items-center gap-2 text-green-700">
-                                    <Mail className="h-4 w-4" />
-                                    <span className="font-medium">{emailResult.email}</span>
-                                    {emailResult.confidence && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {Math.round(emailResult.confidence * 100)}% confidence
-                                      </Badge>
+                              <div className="mt-3 p-3 bg-white rounded border border-gray-200 space-y-2">
+                                {/* Email */}
+                                <div className="flex items-start gap-2">
+                                  <Mail className="h-4 w-4 mt-0.5 text-gray-600" />
+                                  <div className="flex-1">
+                                    <span className="font-medium text-sm text-gray-700">Email: </span>
+                                    {emailResult.emails && emailResult.emails.length > 0 ? (
+                                      <div className="space-y-0.5">
+                                        {emailResult.emails.map((email, idx) => (
+                                          <a key={idx} href={`mailto:${email}`} className="text-sm text-blue-600 hover:underline block">
+                                            {email}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : emailResult.email && !emailResult.email.startsWith('[Hidden') ? (
+                                      <a href={`mailto:${emailResult.email}`} className="text-sm text-blue-600 hover:underline">
+                                        {emailResult.email}
+                                      </a>
+                                    ) : (
+                                      <span className="text-sm text-gray-500 italic">Not available</span>
                                     )}
                                   </div>
-                                ) : emailResult.error ? (
-                                  <div className="flex items-center gap-2 text-red-600">
-                                    <Mail className="h-4 w-4" />
-                                    <span className="text-sm">Error: {emailResult.error}</span>
+                                </div>
+                                
+                                {/* Phone */}
+                                <div className="flex items-start gap-2">
+                                  <svg className="h-4 w-4 mt-0.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                  </svg>
+                                  <div className="flex-1">
+                                    <span className="font-medium text-sm text-gray-700">Phone: </span>
+                                    {emailResult.phones && emailResult.phones.length > 0 ? (
+                                      <div className="space-y-0.5">
+                                        {emailResult.phones.map((phone, idx) => (
+                                          <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
+                                            {phone}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-sm text-gray-500 italic">Not available</span>
+                                    )}
                                   </div>
-                                ) : (
-                                  <div className="flex items-center gap-2 text-gray-500">
-                                    <Mail className="h-4 w-4" />
-                                    <span className="text-sm">No email found</span>
+                                </div>
+                                
+                                {/* LinkedIn */}
+                                <div className="flex items-start gap-2">
+                                  <ExternalLink className="h-4 w-4 mt-0.5 text-gray-600" />
+                                  <div className="flex-1">
+                                    <span className="font-medium text-sm text-gray-700">LinkedIn: </span>
+                                    {emailResult.linkedin ? (
+                                      <a 
+                                        href={emailResult.linkedin} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-blue-600 hover:underline"
+                                      >
+                                        View Profile
+                                      </a>
+                                    ) : (
+                                      <span className="text-sm text-gray-500 italic">Not available</span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Error/Info message */}
+                                {emailResult.error && (
+                                  <div className="text-xs text-amber-600 italic pt-1 border-t">
+                                    {emailResult.error}
                                   </div>
                                 )}
                               </div>
