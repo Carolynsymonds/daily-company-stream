@@ -90,6 +90,8 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
   const [filterByEmail, setFilterByEmail] = useState(false);
   const [filterByPhone, setFilterByPhone] = useState(false);
   const [filterByLinkedIn, setFilterByLinkedIn] = useState(false);
+  const [isFindingAllContacts, setIsFindingAllContacts] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["companies", runId],
@@ -309,6 +311,38 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
     }
   };
 
+  const findAllContactDetails = async () => {
+    if (!companies || !officers) return;
+    
+    setIsFindingAllContacts(true);
+    const allOfficers = officers;
+    const totalOfficers = allOfficers.length;
+    let completed = 0;
+    
+    setProgressMessage(`Finding contact details for ${totalOfficers} officers...`);
+    
+    for (const officer of allOfficers) {
+      // Skip if already searched
+      if (emailSearchResults[officer.id]) {
+        completed++;
+        continue;
+      }
+      
+      await searchEmail(officer);
+      completed++;
+      setProgressMessage(`Progress: ${completed}/${totalOfficers} officers processed`);
+      
+      // Add a small delay to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    setProgressMessage(`Completed! Found contact details for ${completed} officers.`);
+    setTimeout(() => {
+      setProgressMessage("");
+      setIsFindingAllContacts(false);
+    }, 3000);
+  };
+
   const hasContactInfo = (companyId: string, type?: 'email' | 'phone' | 'linkedin') => {
     const companyOfficers = getOfficersForCompany(companyId);
     
@@ -399,16 +433,42 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
             <Building2 className="h-5 w-5" />
             <CardTitle>Company Details</CardTitle>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filter by Contact
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={findAllContactDetails}
+              disabled={isFindingAllContacts}
+              className="gap-2"
+            >
+              {isFindingAllContacts ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Finding...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4" />
+                  Find Contact Details for All
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filter by Contact
+            </Button>
+          </div>
         </div>
+        {progressMessage && (
+          <div className="mt-2 text-sm text-muted-foreground">
+            {progressMessage}
+          </div>
+        )}
         {showFilters && (
           <div className="flex flex-wrap gap-4 mt-3 p-3 bg-gray-50 rounded-lg border">
             <div className="flex items-center space-x-2">
