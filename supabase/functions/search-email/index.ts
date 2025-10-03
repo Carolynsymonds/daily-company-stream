@@ -157,8 +157,18 @@ Deno.serve(async (req) => {
 
     // Helper function to process search results
     const processResults = (data: RocketReachResponse, source: string): Response | null => {
+      console.log(`Processing results from ${source}...`);
+      console.log('Profiles in response:', data.profiles?.length || 0);
+      
       if (data.profiles && data.profiles.length > 0) {
         const profile = data.profiles[0];
+        console.log('Selected profile:', {
+          id: profile.id,
+          name: profile.name,
+          title: profile.current_title,
+          employer: profile.current_employer,
+          location: profile.location
+        });
         
         // Extract all contact information
         const emails = profile.teaser?.emails || [];
@@ -176,29 +186,36 @@ Deno.serve(async (req) => {
           hasLinkedIn: !!profile.linkedin_url,
           preview: preview.length
         });
+        console.log('Email details:', { allEmails, preview });
+        console.log('Phone details:', phones);
+        
+        const responseData = {
+          found: true,
+          email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+          emails: allEmails.length > 0 ? allEmails : undefined,
+          phones: phones.length > 0 ? phones : undefined,
+          linkedin: profile.linkedin_url,
+          source: source,
+          error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+          profile: {
+            name: profile.name,
+            title: profile.current_title,
+            employer: profile.current_employer,
+            location: profile.location
+          }
+        };
+        
+        console.log('Returning successful response:', responseData);
         
         return new Response(
-          JSON.stringify({
-            found: true,
-            email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-            emails: allEmails.length > 0 ? allEmails : undefined,
-            phones: phones.length > 0 ? phones : undefined,
-            linkedin: profile.linkedin_url,
-            source: source,
-            error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
-            profile: {
-              name: profile.name,
-              title: profile.current_title,
-              employer: profile.current_employer,
-              location: profile.location
-            }
-          }),
+          JSON.stringify(responseData),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           }
         );
       }
+      console.log(`No profiles found in ${source}`);
       return null;
     };
 
@@ -210,7 +227,10 @@ Deno.serve(async (req) => {
 
     // SEARCH 1: name + location + company_sic_code
     if (location && company_sic_code) {
+      console.log('Starting Search 1...');
       const companySicNumber = company_sic_code.split(' - ')[0];
+      console.log('Extracted SIC number:', companySicNumber);
+      
       const search1Data = await performSearch({
         'geo[]': `"${location}"`,
         'company_sic_code[]': companySicNumber
@@ -218,32 +238,54 @@ Deno.serve(async (req) => {
 
       if (search1Data) {
         const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)');
-        if (result) return result;
+        if (result) {
+          console.log('Search 1 succeeded, returning result');
+          return result;
+        }
       }
+      console.log('Search 1 did not return a result, continuing to Search 2...');
+    } else {
+      console.log('Skipping Search 1 (missing location or company_sic_code)');
     }
 
     // SEARCH 2: name + detailed_location (if available)
     if (detailed_location) {
+      console.log('Starting Search 2 with detailed_location:', detailed_location);
+      
       const search2Data = await performSearch({
         'geo[]': `"${detailed_location}"`
       }, 'Search 2 (name + detailed_location)');
 
       if (search2Data) {
         const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)');
-        if (result) return result;
+        if (result) {
+          console.log('Search 2 succeeded, returning result');
+          return result;
+        }
       }
+      console.log('Search 2 did not return a result, continuing to Search 3...');
+    } else {
+      console.log('Skipping Search 2 (no detailed_location provided)');
     }
 
     // SEARCH 3: name + location (only if location is available)
     if (location) {
+      console.log('Starting Search 3 with location:', location);
+      
       const search3Data = await performSearch({
         'geo[]': `"${location}"`
       }, 'Search 3 (name + location)');
 
       if (search3Data) {
         const result = processResults(search3Data, 'RocketReach (Search 3: name + location)');
-        if (result) return result;
+        if (result) {
+          console.log('Search 3 succeeded, returning result');
+          return result;
+        }
       }
+      console.log('Search 3 did not return a result');
+    } else {
+      console.log('Skipping Search 3 (no location provided)');
     }
 
     // No results found after all searches
