@@ -10,42 +10,46 @@ interface EmailSearchRequest {
   name: string;
   location?: string;
   company_sic_code?: string;
+  detailed_location?: string;
 }
 
 interface RocketReachResponse {
   profiles?: Array<{
     id?: number;
     name?: string;
-    linkedin_url?: string;
-    location?: string;
     current_title?: string;
     current_employer?: string;
+    location?: string;
+    linkedin_url?: string;
     teaser?: {
       emails?: string[];
-      phones?: string[];
-      preview?: string[];
-      personal_emails?: string[];
       professional_emails?: string[];
+      personal_emails?: string[];
+      phones?: Array<string | { number: string; is_premium?: boolean }>;
+      preview?: string[];
     };
-    [key: string]: any;
   }>;
-  pagination?: {
-    total: number;
-    thisPage: number;
-    nextPage?: number;
-  };
+  total?: number;
+  page?: number;
+  nextPage?: number;
   error?: string;
 }
 
 interface EmailSearchResult {
   email?: string;
   emails?: string[];
-  phones?: string[];
+  phones?: Array<string | { number: string; is_premium?: boolean }>;
   linkedin?: string;
   confidence?: number;
   source?: string;
   found: boolean;
   error?: string;
+  profile?: {
+    name?: string;
+    title?: string;
+    employer?: string;
+    location?: string;
+  };
 }
 
 Deno.serve(async (req) => {
@@ -57,7 +61,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         found: false,
-        error: 'Method not allowed'
+        error: 'Method not allowed. Use POST.'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -67,10 +71,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { name, location, company_sic_code }: EmailSearchRequest = await req.json();
+    const { name, location, company_sic_code, detailed_location }: EmailSearchRequest = await req.json();
     
     console.log('=== Email Search Function Invoked ===');
-    console.log('Request body:', { name, location, company_sic_code });
+    console.log('Request body:', { name, location, company_sic_code, detailed_location });
 
     if (!name) {
       return new Response(
@@ -87,7 +91,6 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get('RR_API_KEY');
     if (!apiKey) {
-      console.error('RocketReach API key not configured');
       return new Response(
         JSON.stringify({
           found: false,
@@ -100,247 +103,161 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build the search URL with query parameters matching RocketReach format
-    const searchUrl = new URL('https://api.rocketreach.co/v1/api/search');
-    searchUrl.searchParams.set('name', name);
-    searchUrl.searchParams.set('start', '1');
-    searchUrl.searchParams.set('pageSize', '10');
-    
-    if (location) {
-      searchUrl.searchParams.set('geo[]', `"${location}"`);
-    }
-
-    // Add company SIC code if available
-    if (company_sic_code) {
-      // Extract just the SIC code number if it includes description
-      const companySicNumber = company_sic_code.split(' - ')[0];
-      searchUrl.searchParams.set('company_sic_code[]', companySicNumber);
-    }
-
-    console.log('RocketReach API Request Parameters:', {
-      name: name,
-      location: location || 'not provided',
-      company_sic_code: company_sic_code || 'not provided',
-      start: '1',
-      pageSize: '10',
-      finalUrl: searchUrl.toString()
-    });
-
-    console.log('=== RocketReach Search URL ===');
-    console.log('Full URL:', searchUrl.toString());
-    console.log('Base URL:', searchUrl.origin + searchUrl.pathname);
-    console.log('Query Parameters:', Object.fromEntries(searchUrl.searchParams));
-    console.log('==============================');
-    
-    console.log('Making RocketReach API request...');
-
-    const response = await fetch(searchUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'Api-Key': apiKey,
-        'Accept': 'application/json',
-      },
-    });
-
-    console.log('RocketReach API Response Status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('RocketReach API Error:', errorText);
-      return new Response(
-        JSON.stringify({
-          found: false,
-          error: `RocketReach API error: ${response.status} ${response.statusText}`
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    }
-
-    // Check if response has content
-    const responseText = await response.text();
-    console.log('RocketReach API Raw Response:', responseText);
-    
-    if (!responseText || responseText.trim() === '') {
-      console.error('Empty response from RocketReach API');
-      return new Response(
-        JSON.stringify({
-          found: false,
-          error: 'Empty response from RocketReach API'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
-
-    let data: RocketReachResponse;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse RocketReach API response as JSON:', parseError);
-      console.error('Response text:', responseText);
-      return new Response(
-        JSON.stringify({
-          found: false,
-          error: 'Invalid JSON response from RocketReach API'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
-    
-    console.log('RocketReach API Response Data:', data);
-    console.log('Number of profiles found:', data.profiles?.length || 0);
-
-    // Check if we have profiles
-    if (data.profiles && data.profiles.length > 0) {
-      console.log('Processing first profile...');
-      const profile = data.profiles[0];
+    // Helper function to perform a search
+    const performSearch = async (searchParams: Record<string, string>, searchName: string): Promise<RocketReachResponse | null> => {
+      const searchUrl = new URL('https://api.rocketreach.co/v1/api/search');
+      searchUrl.searchParams.set('name', name);
+      searchUrl.searchParams.set('start', '1');
+      searchUrl.searchParams.set('pageSize', '10');
       
-      // Extract all contact information
-      const emails = profile.teaser?.emails || [];
-      const professionalEmails = profile.teaser?.professional_emails || [];
-      const personalEmails = profile.teaser?.personal_emails || [];
-      const phones = profile.teaser?.phones || [];
-      const preview = profile.teaser?.preview || [];
-      
-      // Combine all available emails
-      const allEmails = [...emails, ...professionalEmails, ...personalEmails];
-      
-      console.log('Contact info extracted:', {
-        emails: allEmails.length,
-        phones: phones.length,
-        hasLinkedIn: !!profile.linkedin_url,
-        preview: preview.length
+      // Add all search parameters
+      Object.entries(searchParams).forEach(([key, value]) => {
+        if (value) {
+          searchUrl.searchParams.set(key, value);
+        }
       });
-      
-      // Always return if we found a profile (even if some data requires credits)
-      return new Response(
-        JSON.stringify({
-          found: true,
-          email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-          emails: allEmails.length > 0 ? allEmails : undefined,
-          phones: phones.length > 0 ? phones : undefined,
-          linkedin: profile.linkedin_url,
-          source: 'RocketReach',
-          error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
-          profile: {
-            name: profile.name,
-            title: profile.current_title,
-            employer: profile.current_employer,
-            location: profile.location
-          }
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } else {
-      console.log('No profiles found in initial search');
-      
-      // If no results found and we used company_sic_code, try without it
-      if (company_sic_code) {
-        console.log('No results with company_sic_code, trying fallback search without it...');
-        
-        // Build search URL without company_sic_code
-        const fallbackSearchUrl = new URL('https://api.rocketreach.co/v1/api/search');
-        fallbackSearchUrl.searchParams.set('name', name);
-        fallbackSearchUrl.searchParams.set('start', '1');
-        fallbackSearchUrl.searchParams.set('pageSize', '10');
-        
-        if (location) {
-          fallbackSearchUrl.searchParams.set('geo[]', `"${location}"`);
-        }
 
-        console.log('Fallback search URL:', fallbackSearchUrl.toString());
-        console.log('Making fallback RocketReach API request...');
+      console.log(`=== ${searchName} ===`);
+      console.log('Search URL:', searchUrl.toString());
+      console.log('Search Parameters:', Object.fromEntries(searchUrl.searchParams));
+      console.log('==============================');
 
-        const fallbackResponse = await fetch(fallbackSearchUrl.toString(), {
-          method: 'GET',
-          headers: {
-            'Api-Key': apiKey,
-            'Accept': 'application/json',
-          },
-        });
+      const response = await fetch(searchUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Api-Key': apiKey,
+          'Accept': 'application/json',
+        },
+      });
 
-        if (fallbackResponse.ok) {
-          console.log('Fallback response status:', fallbackResponse.status);
-          const fallbackResponseText = await fallbackResponse.text();
-          
-          if (fallbackResponseText && fallbackResponseText.trim() !== '') {
-            try {
-              const fallbackData: RocketReachResponse = JSON.parse(fallbackResponseText);
-              console.log('Fallback search results:', fallbackData);
-              console.log('Fallback profiles found:', fallbackData.profiles?.length || 0);
+      console.log(`${searchName} Response Status:`, response.status);
 
-              if (fallbackData.profiles && fallbackData.profiles.length > 0) {
-                console.log('Processing fallback profile...');
-                const profile = fallbackData.profiles[0];
-                
-                // Extract all contact information
-                const emails = profile.teaser?.emails || [];
-                const professionalEmails = profile.teaser?.professional_emails || [];
-                const personalEmails = profile.teaser?.personal_emails || [];
-                const phones = profile.teaser?.phones || [];
-                const preview = profile.teaser?.preview || [];
-                
-                // Combine all available emails
-                const allEmails = [...emails, ...professionalEmails, ...personalEmails];
-                
-                console.log('Fallback contact info extracted:', {
-                  emails: allEmails.length,
-                  phones: phones.length,
-                  hasLinkedIn: !!profile.linkedin_url
-                });
-                
-                return new Response(
-                  JSON.stringify({
-                    found: true,
-                    email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
-                    emails: allEmails.length > 0 ? allEmails : undefined,
-                    phones: phones.length > 0 ? phones : undefined,
-                    linkedin: profile.linkedin_url,
-                    source: 'RocketReach (fallback search)',
-                    error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
-                    profile: {
-                      name: profile.name,
-                      title: profile.current_title,
-                      employer: profile.current_employer,
-                      location: profile.location
-                    }
-                  }),
-                  {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 200,
-                  }
-                );
-              }
-            } catch (parseError) {
-              console.error('Failed to parse fallback response:', parseError);
-            }
-          }
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`${searchName} API Error:`, errorText);
+        return null;
       }
 
-      console.log('Returning: No profiles found after all attempts');
-      return new Response(
-        JSON.stringify({
-          found: false,
-          error: data.error || 'No profiles found'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === '') {
+        console.error(`${searchName}: Empty response`);
+        return null;
+      }
+
+      try {
+        const data: RocketReachResponse = JSON.parse(responseText);
+        console.log(`${searchName} Response Data:`, data);
+        console.log(`${searchName} Profiles Found:`, data.profiles?.length || 0);
+        return data;
+      } catch (parseError) {
+        console.error(`${searchName}: Failed to parse response:`, parseError);
+        return null;
+      }
+    };
+
+    // Helper function to process search results
+    const processResults = (data: RocketReachResponse, source: string): Response | null => {
+      if (data.profiles && data.profiles.length > 0) {
+        const profile = data.profiles[0];
+        
+        // Extract all contact information
+        const emails = profile.teaser?.emails || [];
+        const professionalEmails = profile.teaser?.professional_emails || [];
+        const personalEmails = profile.teaser?.personal_emails || [];
+        const phones = profile.teaser?.phones || [];
+        const preview = profile.teaser?.preview || [];
+        
+        // Combine all available emails
+        const allEmails = [...emails, ...professionalEmails, ...personalEmails];
+        
+        console.log('Contact info extracted:', {
+          emails: allEmails.length,
+          phones: phones.length,
+          hasLinkedIn: !!profile.linkedin_url,
+          preview: preview.length
+        });
+        
+        return new Response(
+          JSON.stringify({
+            found: true,
+            email: allEmails.length > 0 ? allEmails[0] : (preview.length > 0 ? `[Hidden - ${preview[0]}]` : undefined),
+            emails: allEmails.length > 0 ? allEmails : undefined,
+            phones: phones.length > 0 ? phones : undefined,
+            linkedin: profile.linkedin_url,
+            source: source,
+            error: allEmails.length === 0 && preview.length > 0 ? 'Email/phone requires RocketReach credits to reveal' : undefined,
+            profile: {
+              name: profile.name,
+              title: profile.current_title,
+              employer: profile.current_employer,
+              location: profile.location
+            }
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+      return null;
+    };
+
+    console.log('=== Three-Tier Search Strategy ===');
+    console.log('Search 1: name + location + company_sic_code');
+    console.log('Search 2: name + detailed_location (if available)');
+    console.log('Search 3: name + location');
+    console.log('==================================');
+
+    // SEARCH 1: name + location + company_sic_code
+    if (location && company_sic_code) {
+      const companySicNumber = company_sic_code.split(' - ')[0];
+      const search1Data = await performSearch({
+        'geo[]': `"${location}"`,
+        'company_sic_code[]': companySicNumber
+      }, 'Search 1 (name + location + company_sic_code)');
+
+      if (search1Data) {
+        const result = processResults(search1Data, 'RocketReach (Search 1: name + location + company_sic_code)');
+        if (result) return result;
+      }
     }
+
+    // SEARCH 2: name + detailed_location (if available)
+    if (detailed_location) {
+      const search2Data = await performSearch({
+        'geo[]': `"${detailed_location}"`
+      }, 'Search 2 (name + detailed_location)');
+
+      if (search2Data) {
+        const result = processResults(search2Data, 'RocketReach (Search 2: name + detailed_location)');
+        if (result) return result;
+      }
+    }
+
+    // SEARCH 3: name + location (only if location is available)
+    if (location) {
+      const search3Data = await performSearch({
+        'geo[]': `"${location}"`
+      }, 'Search 3 (name + location)');
+
+      if (search3Data) {
+        const result = processResults(search3Data, 'RocketReach (Search 3: name + location)');
+        if (result) return result;
+      }
+    }
+
+    // No results found after all searches
+    console.log('No profiles found after all search attempts');
+    return new Response(
+      JSON.stringify({
+        found: false,
+        error: 'No profiles found after all search attempts'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
 
   } catch (error) {
     console.error('=== Email Search Function Error ===');

@@ -62,7 +62,7 @@ interface Officer {
 interface EmailSearchResult {
   email?: string;
   emails?: string[];
-  phones?: string[];
+  phones?: Array<string | { number: string; is_premium?: boolean }>;
   linkedin?: string;
   confidence?: number;
   source?: string;
@@ -264,8 +264,18 @@ export const CompaniesPage = () => {
 
       // Use country of residence as location
       let location = "";
+      let detailedLocation = "";
+      
       if (officer.country_of_residence) {
         location = officer.country_of_residence;
+      }
+
+      // Create detailed location from officer address if available
+      if (officer.address) {
+        const addressParts = [];
+        if (officer.address.locality) addressParts.push(officer.address.locality);
+        if (officer.address.country) addressParts.push(officer.address.country);
+        detailedLocation = addressParts.join(", ");
       }
 
       // Get company SIC codes for this officer
@@ -276,6 +286,7 @@ export const CompaniesPage = () => {
         originalName: officer.name,
         searchName: searchName,
         location: location,
+        detailedLocation: detailedLocation,
         company_sic_code: companySicCodeDescription
       });
 
@@ -283,6 +294,7 @@ export const CompaniesPage = () => {
         body: {
           name: searchName,
           location: location,
+          detailed_location: detailedLocation,
           company_sic_code: companySicCodeDescription
         }
       });
@@ -297,7 +309,8 @@ export const CompaniesPage = () => {
           officer_id: officerId,
           email: result.emails && result.emails.length > 0 ? result.emails[0] : 
                  (result.email && !result.email.startsWith('[Hidden') ? result.email : null),
-          phone: result.phones && result.phones.length > 0 ? result.phones[0] : null,
+          phone: result.phones && result.phones.length > 0 ? 
+            (typeof result.phones[0] === 'string' ? result.phones[0] : result.phones[0].number) : null,
           linkedin_url: result.linkedin || null,
           found: result.found,
           error_message: result.error || null,
@@ -755,11 +768,20 @@ export const CompaniesPage = () => {
                                             <span className="font-medium text-sm text-gray-700">Phone: </span>
                                             {emailResult.phones && emailResult.phones.length > 0 ? (
                                               <div className="space-y-0.5">
-                                                {emailResult.phones.map((phone, idx) => (
-                                                  <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
-                                                    {phone}
-                                                  </a>
-                                                ))}
+                                                {emailResult.phones.map((phone, idx) => {
+                                                  const phoneNumber = typeof phone === 'string' ? phone : phone.number;
+                                                  const isPremium = typeof phone === 'object' ? phone.is_premium : false;
+                                                  return (
+                                                    <a 
+                                                      key={idx} 
+                                                      href={`tel:${phoneNumber}`} 
+                                                      className="text-sm text-blue-600 hover:underline block"
+                                                    >
+                                                      {phoneNumber}
+                                                      {isPremium && <span className="ml-1 text-xs text-amber-600">(Premium)</span>}
+                                                    </a>
+                                                  );
+                                                })}
                                               </div>
                                             ) : (
                                               <span className="text-sm text-gray-500 italic">Not available</span>
