@@ -69,7 +69,7 @@ interface Officer {
 interface EmailSearchResult {
   email?: string;
   emails?: string[];
-  phones?: string[];
+  phones?: Array<string | { number: string; is_premium?: boolean }>;
   linkedin?: string;
   confidence?: number;
   source?: string;
@@ -274,6 +274,12 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
       if (error) throw error;
       const result: EmailSearchResult = data;
       
+      // Extract phone number from phone object if needed
+      const firstPhone = result.phones && result.phones.length > 0 ? result.phones[0] : null;
+      const phoneNumber = firstPhone 
+        ? (typeof firstPhone === 'object' && 'number' in firstPhone ? firstPhone.number : String(firstPhone))
+        : null;
+      
       // Save to database
       await supabase
         .from('officer_contacts')
@@ -281,7 +287,7 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
           officer_id: officerId,
           email: result.emails && result.emails.length > 0 ? result.emails[0] : 
                  (result.email && !result.email.startsWith('[Hidden') ? result.email : null),
-          phone: result.phones && result.phones.length > 0 ? result.phones[0] : null,
+          phone: phoneNumber,
           linkedin_url: result.linkedin || null,
           found: result.found,
           error_message: result.error || null,
@@ -659,11 +665,16 @@ export const CompanyDetails = ({ runId }: CompanyDetailsProps) => {
                                             <span className="font-medium text-xs">Phone: </span>
                                             {emailResult.phones && emailResult.phones.length > 0 ? (
                                               <div className="space-y-0.5">
-                                                {emailResult.phones.map((phone, idx) => (
-                                                  <a key={idx} href={`tel:${phone}`} className="text-sm text-blue-600 hover:underline block">
-                                                    {phone}
-                                                  </a>
-                                                ))}
+                                                {emailResult.phones.map((phone, idx) => {
+                                                  const phoneNumber = typeof phone === 'object' && phone && 'number' in phone 
+                                                    ? phone.number 
+                                                    : String(phone);
+                                                  return (
+                                                    <a key={idx} href={`tel:${phoneNumber}`} className="text-sm text-blue-600 hover:underline block">
+                                                      {phoneNumber}
+                                                    </a>
+                                                  );
+                                                })}
                                               </div>
                                             ) : (
                                               <span className="text-sm text-muted-foreground italic">Not available</span>
