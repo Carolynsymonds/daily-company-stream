@@ -1,20 +1,36 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { ScraperControls } from "@/components/ScraperControls";
 import { RunHistoryTable } from "@/components/RunHistoryTable";
 import { LogViewer } from "@/components/LogViewer";
-import { Database, Activity, FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Companies House Scraper</h1>
-          <p className="text-muted-foreground text-lg">
-            Daily data pipeline for newly incorporated UK companies
-          </p>
+        <div className="space-y-2 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">Companies House Scraper</h1>
+            <p className="text-muted-foreground text-lg">
+              Daily data pipeline for newly incorporated UK companies
+            </p>
+          </div>
+          <Button onClick={handleSignOut} variant="outline" size="sm">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
         </div>
 
         {/* Controls */}
