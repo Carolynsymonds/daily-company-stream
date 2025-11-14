@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScraperControls } from "@/components/ScraperControls";
 import { RunHistoryTable } from "@/components/RunHistoryTable";
 import { LogViewer } from "@/components/LogViewer";
+import { QuickSearch } from "@/components/QuickSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
@@ -39,11 +40,24 @@ const Index = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="history" className="space-y-4">
+        <Tabs defaultValue="quick-search" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="quick-search">Quick Search</TabsTrigger>
             <TabsTrigger value="history">Run History</TabsTrigger>
             <TabsTrigger value="logs">Live Logs</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="quick-search" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Company Search</CardTitle>
+                <CardDescription>Search Companies House with custom parameters and download results</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QuickSearch />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="history" className="space-y-4">
             <Card>
