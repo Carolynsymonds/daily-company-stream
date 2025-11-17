@@ -21,6 +21,7 @@ interface CompanySearchResult {
     region?: string;
   };
   sic_codes?: string[];
+  officers?: string[];
 }
 
 export const QuickSearch = () => {
@@ -101,7 +102,7 @@ export const QuickSearch = () => {
       return;
     }
 
-    const headers = ["Company Number", "Company Name", "Status", "Date of Creation", "Address", "SIC Codes"];
+    const headers = ["Company Number", "Company Name", "Status", "Date of Creation", "Address", "SIC Codes", "Officer Names"];
     const csvRows = [headers.join(",")];
 
     results.forEach(company => {
@@ -116,6 +117,7 @@ export const QuickSearch = () => {
         : "";
 
       const sicCodes = company.sic_codes?.join(";") || "";
+      const officerNames = company.officers?.join(";") || "";
 
       const row = [
         company.company_number,
@@ -124,6 +126,7 @@ export const QuickSearch = () => {
         company.date_of_creation,
         `"${address}"`,
         sicCodes,
+        `"${officerNames}"`,
       ];
 
       csvRows.push(row.join(","));
@@ -261,6 +264,7 @@ export const QuickSearch = () => {
                 <TableHead>Date of Creation</TableHead>
                 <TableHead>Address</TableHead>
                 <TableHead>SIC Codes</TableHead>
+                <TableHead>Officer Names</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -272,6 +276,7 @@ export const QuickSearch = () => {
                   <TableCell>{company.date_of_creation}</TableCell>
                   <TableCell className="text-sm">{formatAddress(company.registered_office_address)}</TableCell>
                   <TableCell className="text-sm">{company.sic_codes?.join(", ") || "N/A"}</TableCell>
+                  <TableCell className="text-sm">{company.officers?.join(", ") || "N/A"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
