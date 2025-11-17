@@ -5,6 +5,43 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to fetch officers for a company
+async function fetchOfficers(companyNumber: string, apiKey: string): Promise<string[]> {
+  const officersUrl = `https://api.company-information.service.gov.uk/company/${companyNumber}/officers`;
+  
+  try {
+    const response = await fetch(officersUrl, {
+      headers: {
+        'Authorization': `Basic ${btoa(apiKey + ':')}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    // Handle 429 rate limiting
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || '60';
+      console.warn(`Rate limited on officers API for ${companyNumber}, retrying after ${retryAfter}s`);
+      await new Promise(resolve => setTimeout(resolve, parseInt(retryAfter) * 1000));
+      return fetchOfficers(companyNumber, apiKey); // Retry
+    }
+
+    if (!response.ok) {
+      console.error(`Officers API error for ${companyNumber}: ${response.status}`);
+      return []; // Return empty array on error
+    }
+
+    const data = await response.json();
+    
+    // Extract officer names from items array
+    const officerNames = data.items?.map((officer: any) => officer.name) || [];
+    console.log(`Found ${officerNames.length} officers for company ${companyNumber}`);
+    return officerNames;
+  } catch (error) {
+    console.error(`Error fetching officers for ${companyNumber}:`, error);
+    return [];
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -67,9 +104,21 @@ serve(async (req) => {
 
     console.log(`Successfully fetched ${data.items?.length || 0} companies`);
 
+    // Fetch officers for each company sequentially to avoid rate limiting
+    const companiesWithOfficers = [];
+    for (const company of (data.items || [])) {
+      const officers = await fetchOfficers(company.company_number, apiKey);
+      companiesWithOfficers.push({
+        ...company,
+        officers: officers
+      });
+    }
+
+    console.log(`Enriched ${companiesWithOfficers.length} companies with officer data`);
+
     return new Response(
       JSON.stringify({
-        items: data.items || [],
+        items: companiesWithOfficers,
         total_results: data.total_results || 0,
         query_params: { sic_codes, incorporated_from, incorporated_to, location, size }
       }),
